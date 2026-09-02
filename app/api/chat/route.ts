@@ -25,7 +25,8 @@ Strict Guidelines:
 3. Every media token MUST be completely closed with a closing square bracket ']' immediately after the title/vendor: ![media:Title|vendor].
 4. The title inside ![media:...] MUST be the exact name of a real entity or phenomenon.
 5. Spread the tokens naturally across all sentences so the entire reading experience feels like an interactive multimedia documentary.
-6. Never leave a token unclosed. Never wrap tokens in code blocks or backticks.`;
+6. Never leave a token unclosed. Never wrap tokens in code blocks or backticks.
+7. ABSOLUTE ZERO DUPLICATION RULE: Every single visual capsule in your answer MUST depict a completely different, unique subject or entity. NEVER illustrate the same entity twice (e.g. do not create capsules for both "Venus" and "Morning star", and never repeat "![media:Venus|...]" twice). If an entity is mentioned again, do NOT attach a capsule to it; instead, illustrate a different related aspect (e.g. "Atmosphere of Venus", "Volcanism on Venus", or "Magellan spacecraft").`;
 
 export async function POST(request: NextRequest) {
   try {

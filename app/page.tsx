@@ -503,7 +503,7 @@ export default function PlaygroundPage() {
                 type="text"
                 value={customInput}
                 onChange={(e) => setCustomInput(e.target.value)}
-                placeholder="Ask or test tokens: 'Tell me about Saturn ![media:Saturn]'"
+                placeholder="Ask anything about science, nature, cosmos..."
                 className="w-full bg-[#111317] border border-white/10 focus:border-amber-400/50 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-amber-400/50 shadow-md pr-10 transition-all"
               />
               <button
@@ -514,9 +514,6 @@ export default function PlaygroundPage() {
                 <Send className="w-3.5 h-3.5" />
               </button>
             </div>
-            <p className="text-[10px] text-zinc-500 mt-1 pl-1">
-              Tip: Include <code className="text-amber-400/90 font-mono">![media:query]</code> anywhere to resolve inline media.
-            </p>
           </form>
         </main>
 

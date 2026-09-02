@@ -24,6 +24,7 @@ export type MarkdownToken =
       query: string;
       mediaType?: MediaType;
       vendorPreference?: 'wikipedia' | 'duckduckgo' | 'auto';
+      occurrenceIndex?: number;
       fallbackUrl?: string;
       id: string;
       isPartial?: boolean;

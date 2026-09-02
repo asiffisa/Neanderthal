@@ -1,6 +1,6 @@
 'use client';
 
-import React, { memo } from 'react';
+import React, { memo, useRef, useEffect } from 'react';
 import { CapsuleSettings, ResolvedMedia } from '../core/types';
 import { tokenizeStreamingMarkdown } from '../core/tokenizer';
 import { InlineCapsule } from './InlineCapsule';
@@ -20,12 +20,22 @@ export const StreamingMarkdownView: React.FC<StreamingMarkdownViewProps> = memo(
   onInspect,
   className = '',
 }) => {
+  const claimedUrlsRef = useRef<Map<string, string>>(new Map());
+
+  // Clear claimed URLs when content resets
+  useEffect(() => {
+    if (!content) {
+      claimedUrlsRef.current.clear();
+    }
+  }, [content]);
+
   if (!content) {
     return null;
   }
 
   // Split into paragraphs by double newlines
   const paragraphs = content.split(/\n\n+/);
+  const globalQueryCounts = new Map<string, number>();
 
   const renderInlineContent = (lineText: string) => {
     // 1. Tokenize media tokens
@@ -33,11 +43,18 @@ export const StreamingMarkdownView: React.FC<StreamingMarkdownViewProps> = memo(
 
     return tokens.map((token, idx) => {
       if (token.type === 'media') {
+        const normalized = token.query.toLowerCase();
+        const occ = globalQueryCounts.get(normalized) || 0;
+        globalQueryCounts.set(normalized, occ + 1);
+
         return (
           <InlineCapsule
             key={token.id || `token-${idx}`}
+            id={token.id || `token-${idx}`}
             query={token.query}
             vendorPreference={token.vendorPreference}
+            occurrenceIndex={occ}
+            claimedUrlsRef={claimedUrlsRef}
             fallbackUrl={token.fallbackUrl}
             isPartial={token.isPartial}
             settings={settings}

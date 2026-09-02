@@ -3,7 +3,9 @@ import { NextRequest, NextResponse } from 'next/server';
 export const dynamic = 'force-dynamic';
 
 async function searchDuckDuckGo(
-  query: string
+  query: string,
+  excludeUrl?: string,
+  occurrence: number = 0
 ): Promise<{ title: string; imageUrl: string; sourceUrl: string } | null> {
   const userAgent =
     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
@@ -35,13 +37,23 @@ async function searchDuckDuckGo(
 
     if (!imgRes.ok) return null;
     const imgData = await imgRes.json();
-    const first = imgData.results?.[0];
+    const results = imgData.results || [];
 
-    if (first && (first.thumbnail || first.image)) {
+    // Filter out duplicate or excluded images
+    const valid = results.filter((r: any) => {
+      const u = r.thumbnail || r.image;
+      if (!u) return false;
+      if (excludeUrl && (u.includes(excludeUrl) || excludeUrl.includes(u))) return false;
+      return true;
+    });
+
+    const chosen = valid[occurrence] || valid[0];
+
+    if (chosen && (chosen.thumbnail || chosen.image)) {
       return {
-        title: first.title || query,
-        imageUrl: first.thumbnail || first.image,
-        sourceUrl: first.url || `https://duckduckgo.com/?q=${encodeURIComponent(query)}`,
+        title: chosen.title || query,
+        imageUrl: chosen.thumbnail || chosen.image,
+        sourceUrl: chosen.url || `https://duckduckgo.com/?q=${encodeURIComponent(query)}`,
       };
     }
   } catch (err) {
@@ -75,13 +87,15 @@ export async function GET(request: NextRequest) {
     searchParams.get('source')?.toLowerCase() ||
     searchParams.get('vendor')?.toLowerCase() ||
     'auto';
+  const excludeUrl = searchParams.get('exclude')?.trim() || '';
+  const occurrence = parseInt(searchParams.get('occurrence') || '0', 10);
 
   if (!query || !query.trim()) {
     return NextResponse.json({ error: 'Missing query parameter q' }, { status: 400 });
   }
 
   const cleanQuery = query.trim();
-  const cacheKey = `${cleanQuery.toLowerCase()}:${requestedVendor}`;
+  const cacheKey = `${cleanQuery.toLowerCase()}:${requestedVendor}:${excludeUrl}:${occurrence}`;
 
   const cached = serverResolveCache.get(cacheKey);
   if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
@@ -102,6 +116,12 @@ export async function GET(request: NextRequest) {
     let rawImageUrl: string | null = null;
     let resolvedVendor: 'wikipedia' | 'duckduckgo' = 'wikipedia';
 
+    const isExcluded = (url: string | null | undefined): boolean => {
+      if (!url) return true;
+      if (excludeUrl && (url.includes(excludeUrl) || excludeUrl.includes(url))) return true;
+      return false;
+    };
+
     // VENDOR ROUTING: If AI chose DuckDuckGo (or web), prioritize DuckDuckGo live web search
     const wantsDuckDuckGo =
       requestedVendor === 'duckduckgo' ||
@@ -109,7 +129,7 @@ export async function GET(request: NextRequest) {
       requestedVendor === 'web';
 
     if (wantsDuckDuckGo) {
-      const ddgResult = await searchDuckDuckGo(cleanQuery);
+      const ddgResult = await searchDuckDuckGo(cleanQuery, excludeUrl, occurrence);
       if (ddgResult) {
         rawImageUrl = ddgResult.imageUrl;
         resolvedTitle = ddgResult.title || cleanQuery;
@@ -130,59 +150,63 @@ export async function GET(request: NextRequest) {
         cache: 'no-store',
       });
 
-    if (res.ok) {
-      const data = await res.json();
-      const pages = data.query?.pages || {};
-      const pageId = Object.keys(pages)[0];
-      const page = pageId && pageId !== '-1' ? pages[pageId] : null;
+      if (res.ok) {
+        const data = await res.json();
+        const pages = data.query?.pages || {};
+        const pageId = Object.keys(pages)[0];
+        const page = pageId && pageId !== '-1' ? pages[pageId] : null;
 
-      if (page) {
-        resolvedTitle = page.title || cleanQuery;
-        resolvedSourceUrl = `https://en.wikipedia.org/wiki/${encodeURIComponent(resolvedTitle)}`;
-        if (page.extract) {
-          description = page.extract.slice(0, 220) + '...';
-        }
+        if (page) {
+          resolvedTitle = page.title || cleanQuery;
+          resolvedSourceUrl = `https://en.wikipedia.org/wiki/${encodeURIComponent(resolvedTitle)}`;
+          if (page.extract) {
+            description = page.extract.slice(0, 220) + '...';
+          }
 
-        // 1A. Lead thumbnail
-        if (page.thumbnail?.source) {
-          rawImageUrl = page.thumbnail.source;
-        } else {
-          // 1B. Content images inside the article
-          const rawImages = (page.images || []).map((i: { title: string }) => i.title);
-          const contentImages = rawImages.filter((img: string) => {
-            const lower = img.toLowerCase();
-            return (
-              !lower.includes('logo') &&
-              !lower.includes('book') &&
-              !lower.includes('symbol') &&
-              !lower.includes('ambox') &&
-              !lower.includes('.svg') &&
-              !lower.includes('.pdf') &&
-              !lower.includes('flag') &&
-              !lower.includes('stub') &&
-              !lower.includes('icon')
-            );
-          });
-
-          if (contentImages.length > 0) {
-            const firstImg = contentImages[0];
-            const infoUrl = `https://en.wikipedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url&iiurlwidth=600&titles=${encodeURIComponent(
-              firstImg
-            )}&format=json&origin=*`;
-            const resInfo = await fetch(infoUrl, {
-              headers: { 'User-Agent': userAgent },
-              cache: 'no-store',
+          // 1A. Lead thumbnail (skip if excluded or if asking for alternative occurrence)
+          if (page.thumbnail?.source && !isExcluded(page.thumbnail.source) && occurrence === 0) {
+            rawImageUrl = page.thumbnail.source;
+          } else {
+            // 1B. Content images inside the article
+            const rawImages = (page.images || []).map((i: { title: string }) => i.title);
+            const contentImages = rawImages.filter((img: string) => {
+              const lower = img.toLowerCase();
+              return (
+                !lower.includes('logo') &&
+                !lower.includes('book') &&
+                !lower.includes('symbol') &&
+                !lower.includes('ambox') &&
+                !lower.includes('.svg') &&
+                !lower.includes('.pdf') &&
+                !lower.includes('flag') &&
+                !lower.includes('stub') &&
+                !lower.includes('icon')
+              );
             });
-            if (resInfo.ok) {
-              const infoData = await resInfo.json();
-              const infoPage = Object.values(infoData.query?.pages || {})[0] as any;
-              rawImageUrl = infoPage?.imageinfo?.[0]?.thumburl || infoPage?.imageinfo?.[0]?.url || null;
+
+            const candidateSlice = contentImages.slice(occurrence, occurrence + 6);
+            for (const imgName of candidateSlice) {
+              const infoUrl = `https://en.wikipedia.org/w/api.php?action=query&prop=imageinfo&iiprop=url&iiurlwidth=600&titles=${encodeURIComponent(
+                imgName
+              )}&format=json&origin=*`;
+              const resInfo = await fetch(infoUrl, {
+                headers: { 'User-Agent': userAgent },
+                cache: 'no-store',
+              });
+              if (resInfo.ok) {
+                const infoData = await resInfo.json();
+                const infoPage = Object.values(infoData.query?.pages || {})[0] as any;
+                const candidateUrl = infoPage?.imageinfo?.[0]?.thumburl || infoPage?.imageinfo?.[0]?.url;
+                if (candidateUrl && !isExcluded(candidateUrl)) {
+                  rawImageUrl = candidateUrl;
+                  break;
+                }
+              }
             }
           }
         }
       }
     }
-  }
 
     // LAYER 2: If no image found yet, search Wikimedia Commons
     if (!rawImageUrl) {
@@ -202,7 +226,7 @@ export async function GET(request: NextRequest) {
           const info = cp.imageinfo?.[0];
           const url = info?.thumburl || info?.url;
           const lower = (cp.title || '').toLowerCase();
-          if (url && !lower.includes('.pdf') && !lower.includes('.svg') && !lower.includes('logo')) {
+          if (url && !lower.includes('.pdf') && !lower.includes('.svg') && !lower.includes('logo') && !isExcluded(url)) {
             rawImageUrl = url;
             break;
           }
@@ -227,7 +251,7 @@ export async function GET(request: NextRequest) {
         if (resSimp.ok) {
           const simpData = await resSimp.json();
           const simpPage = Object.values(simpData.query?.pages || {})[0] as any;
-          if (simpPage?.thumbnail?.source) {
+          if (simpPage?.thumbnail?.source && !isExcluded(simpPage.thumbnail.source)) {
             rawImageUrl = simpPage.thumbnail.source;
             if (!description || description.includes('Public domain')) {
               description = simpPage.extract ? simpPage.extract.slice(0, 220) + '...' : description;
@@ -239,7 +263,7 @@ export async function GET(request: NextRequest) {
 
     // LAYER 4: DuckDuckGo Live Web Image Search (Universal free fallback for modern topics, gadgets, culture)
     if (!rawImageUrl) {
-      const ddgResult = await searchDuckDuckGo(cleanQuery);
+      const ddgResult = await searchDuckDuckGo(cleanQuery, excludeUrl, occurrence);
       if (ddgResult) {
         rawImageUrl = ddgResult.imageUrl;
         resolvedTitle = ddgResult.title || cleanQuery;

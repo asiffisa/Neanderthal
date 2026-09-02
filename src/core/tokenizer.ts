@@ -11,6 +11,7 @@ export function tokenizeStreamingMarkdown(text: string, isStreaming: boolean = f
 
   const tokens: MarkdownToken[] = [];
   let currentIndex = 0;
+  const queryCounts = new Map<string, number>();
 
   // Regular expression to match complete media tokens:
   // Group 1: query and optional type (e.g. "Neanderthal skull" or "Neanderthal skull|image")
@@ -46,6 +47,9 @@ export function tokenizeStreamingMarkdown(text: string, isStreaming: boolean = f
     }
 
     const fallbackUrl = match[2]?.trim();
+    const normalized = query.toLowerCase();
+    const occurrenceIndex = queryCounts.get(normalized) || 0;
+    queryCounts.set(normalized, occurrenceIndex + 1);
 
     tokens.push({
       type: 'media',
@@ -53,6 +57,7 @@ export function tokenizeStreamingMarkdown(text: string, isStreaming: boolean = f
       query,
       mediaType: 'image',
       vendorPreference,
+      occurrenceIndex,
       fallbackUrl,
       id: `media-${matchStart}-${encodeURIComponent(query).slice(0, 20)}`,
     });

@@ -12,9 +12,11 @@ const inFlightRequests = new Map<string, Promise<ResolvedMedia>>();
 export async function resolveMedia(
   query: string,
   fallbackUrl?: string,
-  vendorPreference: 'wikipedia' | 'duckduckgo' | 'auto' = 'auto'
+  vendorPreference: 'wikipedia' | 'duckduckgo' | 'auto' = 'auto',
+  excludeUrl?: string,
+  occurrence: number = 0
 ): Promise<ResolvedMedia> {
-  const normalizedKey = `${query.trim().toLowerCase()}:${vendorPreference}`;
+  const normalizedKey = `${query.trim().toLowerCase()}:${vendorPreference}:${excludeUrl || ''}:${occurrence}`;
 
   // 1. Check in-memory session cache
   if (memoryCache.has(normalizedKey)) {
@@ -31,6 +33,8 @@ export async function resolveMedia(
     try {
       const url = `/api/resolve?q=${encodeURIComponent(query)}${
         vendorPreference !== 'auto' ? `&source=${vendorPreference}` : ''
+      }${excludeUrl ? `&exclude=${encodeURIComponent(excludeUrl)}` : ''}${
+        occurrence > 0 ? `&occurrence=${occurrence}` : ''
       }`;
       const res = await fetch(url);
       if (res.ok) {

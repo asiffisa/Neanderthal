@@ -14,6 +14,9 @@ interface InlineCapsuleProps {
   isPartial?: boolean;
   settings: CapsuleSettings;
   onInspect?: (media: ResolvedMedia) => void;
+  id?: string;
+  occurrenceIndex?: number;
+  claimedUrlsRef?: React.MutableRefObject<Map<string, string>>;
 }
 
 export const InlineCapsule: React.FC<InlineCapsuleProps> = memo(({
@@ -23,6 +26,9 @@ export const InlineCapsule: React.FC<InlineCapsuleProps> = memo(({
   isPartial = false,
   settings,
   onInspect,
+  id,
+  occurrenceIndex = 0,
+  claimedUrlsRef,
 }) => {
   const [media, setMedia] = useState<ResolvedMedia>({
     query,
@@ -58,16 +64,59 @@ export const InlineCapsule: React.FC<InlineCapsuleProps> = memo(({
 
     let isCurrent = true;
 
-    resolveMedia(query, fallbackUrl, vendorPreference).then((res) => {
+    async function loadUniqueMedia() {
+      // 1. Initial resolution with query occurrence index
+      let res = await resolveMedia(
+        query,
+        fallbackUrl,
+        vendorPreference,
+        undefined,
+        occurrenceIndex
+      );
+
+      if (!isCurrent) return;
+
+      // 2. Anti-duplication check: if another capsule in this document already displays this image URL
+      if (claimedUrlsRef && res.thumbnailUrl) {
+        const capsuleKey = id || query;
+        const isDuplicate = Array.from(claimedUrlsRef.current.entries()).some(
+          ([otherId, url]) => otherId !== capsuleKey && url === res.thumbnailUrl
+        );
+
+        if (isDuplicate) {
+          // Collision detected! Fetch alternative image excluding this duplicate URL
+          const altRes = await resolveMedia(
+            query,
+            fallbackUrl,
+            vendorPreference,
+            res.thumbnailUrl,
+            occurrenceIndex + 1
+          );
+
+          if (isCurrent && altRes.thumbnailUrl) {
+            res = altRes;
+          }
+        }
+
+        if (res.thumbnailUrl) {
+          claimedUrlsRef.current.set(capsuleKey, res.thumbnailUrl);
+        }
+      }
+
       if (isCurrent) {
         setMedia(res);
       }
-    });
+    }
+
+    loadUniqueMedia();
 
     return () => {
       isCurrent = false;
+      if (claimedUrlsRef && (id || query)) {
+        claimedUrlsRef.current.delete(id || query);
+      }
     };
-  }, [query, fallbackUrl, vendorPreference, isPartial]);
+  }, [query, fallbackUrl, vendorPreference, isPartial, occurrenceIndex, id, claimedUrlsRef]);
 
   const handleMouseEnter = () => {
     if (!settings.showHoverCard) return;
