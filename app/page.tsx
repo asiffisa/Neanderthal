@@ -6,7 +6,6 @@ import {
   Play,
   RotateCcw,
   Sliders,
-  Code2,
   Image as ImageIcon,
   Sparkles,
   ChevronRight,
@@ -70,7 +69,7 @@ export default function PlaygroundPage() {
   const [streamIndex, setStreamIndex] = useState(0);
 
   // Inspector & UI settings
-  const [activeTab, setActiveTab] = useState<'design' | 'ast' | 'media'>('design');
+  const [activeTab, setActiveTab] = useState<'design' | 'media'>('design');
   const [capsuleSettings, setCapsuleSettings] = useState<CapsuleSettings>(DEFAULT_CAPSULE_SETTINGS);
   const [inspectMedia, setInspectMedia] = useState<ResolvedMedia | null>(null);
 
@@ -520,18 +519,6 @@ export default function PlaygroundPage() {
               </button>
               <button
                 type="button"
-                onClick={() => setActiveTab('ast')}
-                className={`flex-1 py-2.5 px-2 text-[11px] font-semibold flex items-center justify-center gap-1 transition-colors border-b-2 ${
-                  activeTab === 'ast'
-                    ? 'border-amber-400 text-amber-300 bg-white/5'
-                    : 'border-transparent text-zinc-400 hover:text-zinc-200'
-                }`}
-              >
-                <Code2 className="w-3 h-3" />
-                AST
-              </button>
-              <button
-                type="button"
                 onClick={() => setActiveTab('media')}
                 className={`flex-1 py-2.5 px-2 text-[11px] font-semibold flex items-center justify-center gap-1 transition-colors border-b-2 ${
                   activeTab === 'media'
@@ -648,56 +635,7 @@ export default function PlaygroundPage() {
                 </div>
               )}
 
-              {/* Tab 2: Standard AST & Token Stream */}
-              {activeTab === 'ast' && (
-                <div className="space-y-3">
-                  <div className="p-3 rounded-lg bg-black/40 border border-white/10 space-y-1">
-                    <span className="font-mono text-[11px] text-amber-400 uppercase font-semibold">
-                      Open Standard Token Syntax
-                    </span>
-                    <p className="text-zinc-300 text-[11px]">
-                      <code className="font-mono text-white bg-white/10 px-1 py-0.5 rounded">
-                        ![media:Query String]
-                      </code>
-                    </p>
-                    <p className="text-zinc-500 text-[11px] leading-relaxed pt-1">
-                      Degrades gracefully as standard Markdown alt-text in non-supporting clients, while empowering modern LLM engines to resolve high-res public domain media.
-                    </p>
-                  </div>
-
-                  <div>
-                    <span className="font-mono text-[11px] uppercase tracking-wider text-zinc-400 block mb-1">
-                      Live Parsed AST Nodes ({activeTokens.length})
-                    </span>
-                    <div className="p-3 rounded-lg bg-black/50 border border-white/10 font-mono text-[11px] overflow-x-auto max-h-72 space-y-1.5 scrollbar-thin">
-                      {activeTokens.map((token, i) => (
-                        <div
-                          key={i}
-                          className={`p-1.5 rounded ${
-                            token.type === 'media'
-                              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                              : 'text-zinc-400'
-                          }`}
-                        >
-                          <span className="font-bold uppercase text-[10px]">
-                            [{token.type}]
-                          </span>{' '}
-                          {token.type === 'media' ? (
-                            <span>query: &quot;{token.query}&quot;</span>
-                          ) : (
-                            <span>
-                              &quot;{token.content.slice(0, 30)}
-                              {token.content.length > 30 ? '...' : ''}&quot;
-                            </span>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Tab 3: Media Pool */}
+              {/* Tab 2: Media Pool */}
               {activeTab === 'media' && (
                 <div className="space-y-3">
                   <p className="text-zinc-400 text-[11px]">
