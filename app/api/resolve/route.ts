@@ -50,6 +50,23 @@ async function searchDuckDuckGo(
   return null;
 }
 
+interface ServerCacheEntry {
+  data: {
+    query: string;
+    title: string;
+    description: string;
+    thumbnailUrl: string;
+    fullImageUrl: string;
+    sourceUrl: string;
+    status: string;
+  };
+  timestamp: number;
+}
+
+const serverResolveCache = new Map<string, ServerCacheEntry>();
+const CACHE_TTL_MS = 1000 * 60 * 60; // 1 hour
+const MAX_CACHE_SIZE = 500;
+
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const query = searchParams.get('q');
@@ -59,6 +76,17 @@ export async function GET(request: NextRequest) {
   }
 
   const cleanQuery = query.trim();
+  const cacheKey = cleanQuery.toLowerCase();
+
+  const cached = serverResolveCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+    return NextResponse.json(cached.data, {
+      headers: {
+        'Cache-Control': 'public, s-maxage=86400, stale-while-revalidate=604800',
+        'X-Cache': 'HIT',
+      },
+    });
+  }
 
   try {
     const userAgent = 'NeanderthalApp/1.0 (https://github.com/asif/neanderthal; contact@neanderthal-demo.com)';
@@ -202,22 +230,29 @@ export async function GET(request: NextRequest) {
         ? `/api/media-proxy?url=${encodeURIComponent(rawImageUrl)}`
         : rawImageUrl;
 
-      return NextResponse.json(
-        {
-          query: cleanQuery,
-          title: resolvedTitle,
-          description,
-          thumbnailUrl,
-          fullImageUrl: thumbnailUrl,
-          sourceUrl: resolvedSourceUrl,
-          status: 'loaded',
+      const payload = {
+        query: cleanQuery,
+        title: resolvedTitle,
+        description,
+        thumbnailUrl,
+        fullImageUrl: thumbnailUrl,
+        sourceUrl: resolvedSourceUrl,
+        status: 'loaded',
+      };
+
+      // Store in memory cache with eviction
+      if (serverResolveCache.size >= MAX_CACHE_SIZE) {
+        const oldestKey = serverResolveCache.keys().next().value;
+        if (oldestKey) serverResolveCache.delete(oldestKey);
+      }
+      serverResolveCache.set(cacheKey, { data: payload, timestamp: Date.now() });
+
+      return NextResponse.json(payload, {
+        headers: {
+          'Cache-Control': 'public, s-maxage=86400, stale-while-revalidate=604800',
+          'X-Cache': 'MISS',
         },
-        {
-          headers: {
-            'Cache-Control': 'public, s-maxage=86400, stale-while-revalidate=604800',
-          },
-        }
-      );
+      });
     }
 
     return NextResponse.json({

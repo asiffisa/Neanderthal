@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ExternalLink, Sparkles } from 'lucide-react';
 import { ResolvedMedia } from '../core/types';
@@ -11,28 +11,45 @@ interface MediaLightboxProps {
 }
 
 export const MediaLightbox: React.FC<MediaLightboxProps> = ({ media, onClose }) => {
-  if (!media) return null;
+  // Listen for Escape key to close modal
+  useEffect(() => {
+    if (!media) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [media, onClose]);
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 md:p-10">
-        {/* Backdrop */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          onClick={onClose}
-          className="fixed inset-0 bg-black/80 backdrop-blur-md"
-        />
-
-        {/* Modal Window */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95, y: 10 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 10 }}
-          transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-          className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-[#111317] border border-white/15 shadow-2xl z-10 flex flex-col"
+      {media && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 md:p-10"
         >
+          {/* Backdrop */}
+          <motion.div
+            key="lightbox-backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+            className="fixed inset-0 bg-black/80 backdrop-blur-md"
+          />
+
+          {/* Modal Window */}
+          <motion.div
+            key="lightbox-modal"
+            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 10 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+            className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-[#111317] border border-white/15 shadow-2xl z-10 flex flex-col"
+          >
           {/* Top Bar */}
           <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
             <div className="flex items-center gap-2">
@@ -99,6 +116,7 @@ export const MediaLightbox: React.FC<MediaLightboxProps> = ({ media, onClose }) 
           </div>
         </motion.div>
       </div>
-    </AnimatePresence>
-  );
+    )}
+  </AnimatePresence>
+);
 };

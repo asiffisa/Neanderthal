@@ -1,4 +1,4 @@
-import { MarkdownToken, MediaType } from './types';
+import { MarkdownToken } from './types';
 
 /**
  * Streaming Tokenizer for Neanderthal Inline Media Markdown
@@ -11,7 +11,6 @@ export function tokenizeStreamingMarkdown(text: string, isStreaming: boolean = f
 
   const tokens: MarkdownToken[] = [];
   let currentIndex = 0;
-  let counter = 0;
 
   // Regular expression to match complete media tokens:
   // Group 1: query and optional type (e.g. "Neanderthal skull" or "Neanderthal skull|image")
@@ -41,7 +40,7 @@ export function tokenizeStreamingMarkdown(text: string, isStreaming: boolean = f
       query,
       mediaType: 'image',
       fallbackUrl,
-      id: `media-${counter++}-${encodeURIComponent(query).slice(0, 16)}`,
+      id: `media-${matchStart}-${encodeURIComponent(query).slice(0, 20)}`,
     });
 
     currentIndex = matchEnd;
@@ -70,7 +69,7 @@ export function tokenizeStreamingMarkdown(text: string, isStreaming: boolean = f
           raw: partialMatch[0],
           query: partialQuery || 'Visualizing...',
           mediaType: 'image',
-          id: `media-streaming-${counter++}`,
+          id: `media-streaming-${currentIndex}`,
           isPartial: true,
         });
       } else if (partialQuery) {
@@ -80,7 +79,7 @@ export function tokenizeStreamingMarkdown(text: string, isStreaming: boolean = f
           raw: partialMatch[0],
           query: partialQuery,
           mediaType: 'image',
-          id: `media-healed-${counter++}`,
+          id: `media-healed-${currentIndex}`,
           isPartial: false,
         });
       }

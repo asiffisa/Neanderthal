@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { memo } from 'react';
 import { CapsuleSettings, ResolvedMedia } from '../core/types';
 import { tokenizeStreamingMarkdown } from '../core/tokenizer';
 import { InlineCapsule } from './InlineCapsule';
@@ -13,7 +13,7 @@ interface StreamingMarkdownViewProps {
   className?: string;
 }
 
-export const StreamingMarkdownView: React.FC<StreamingMarkdownViewProps> = ({
+export const StreamingMarkdownView: React.FC<StreamingMarkdownViewProps> = memo(({
   content,
   isStreaming = false,
   settings,
@@ -125,4 +125,4 @@ export const StreamingMarkdownView: React.FC<StreamingMarkdownViewProps> = ({
       )}
     </div>
   );
-};
+});

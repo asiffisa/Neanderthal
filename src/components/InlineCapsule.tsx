@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, memo } from 'react';
 import { createPortal } from 'react-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import { ExternalLink, Maximize2, Sparkles, ImageOff } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { ExternalLink, Maximize2, Sparkles } from 'lucide-react';
 import { CapsuleSettings, ResolvedMedia } from '../core/types';
 import { resolveMedia } from '../lib/wikimedia';
 
@@ -15,7 +15,7 @@ interface InlineCapsuleProps {
   onInspect?: (media: ResolvedMedia) => void;
 }
 
-export const InlineCapsule: React.FC<InlineCapsuleProps> = ({
+export const InlineCapsule: React.FC<InlineCapsuleProps> = memo(({
   query,
   fallbackUrl,
   isPartial = false,
@@ -37,6 +37,11 @@ export const InlineCapsule: React.FC<InlineCapsuleProps> = ({
 
   useEffect(() => {
     setMounted(true);
+    return () => {
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -258,4 +263,4 @@ export const InlineCapsule: React.FC<InlineCapsuleProps> = ({
         )}
     </>
   );
-};
+});

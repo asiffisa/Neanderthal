@@ -1,9 +1,8 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Play,
   RotateCcw,
   Sliders,
   Image as ImageIcon,
@@ -11,11 +10,8 @@ import {
   ChevronRight,
   Send,
   Zap,
-  Layers,
-  HelpCircle,
   Shuffle,
   Key,
-  Check,
   X,
   ExternalLink,
   AlertCircle,
@@ -28,6 +24,7 @@ import {
   ResolvedMedia,
 } from '../src/core/types';
 import { tokenizeStreamingMarkdown } from '../src/core/tokenizer';
+import { resolveMedia } from '../src/lib/wikimedia';
 import { StreamingMarkdownView } from '../src/components/StreamingMarkdownView';
 import { MediaLightbox } from '../src/components/MediaLightbox';
 
@@ -66,7 +63,6 @@ export default function PlaygroundPage() {
   const [streamedText, setStreamedText] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamSpeed, setStreamSpeed] = useState<number>(30); // ms per chunk
-  const [streamIndex, setStreamIndex] = useState(0);
 
   // Inspector & UI settings
   const [activeTab, setActiveTab] = useState<'design' | 'media'>('design');
@@ -113,7 +109,6 @@ export default function PlaygroundPage() {
       abortControllerRef.current.abort();
     }
     setStreamedText('');
-    setStreamIndex(0);
     setIsStreaming(true);
 
     let currentIndex = 0;
@@ -123,11 +118,9 @@ export default function PlaygroundPage() {
       currentIndex += stepSize;
       if (currentIndex >= fullContent.length) {
         setStreamedText(fullContent);
-        setStreamIndex(fullContent.length);
         stopStreaming();
       } else {
         setStreamedText(fullContent.slice(0, currentIndex));
-        setStreamIndex(currentIndex);
       }
     }, streamSpeed);
   };
@@ -139,7 +132,6 @@ export default function PlaygroundPage() {
     }
     if (fullTextToStream) {
       setStreamedText(fullTextToStream);
-      setStreamIndex(fullTextToStream.length);
     }
   };
 
@@ -198,7 +190,6 @@ export default function PlaygroundPage() {
         const chunk = decoder.decode(value, { stream: true });
         accumulated += chunk;
         setStreamedText(accumulated);
-        setStreamIndex(accumulated.length);
       }
     } catch (err: unknown) {
       if (err instanceof Error && err.name === 'AbortError') {
@@ -270,9 +261,20 @@ export default function PlaygroundPage() {
     setApiError(null);
   };
 
-  // Compute AST tokens for live inspector
-  const activeTokens: MarkdownToken[] = tokenizeStreamingMarkdown(streamedText, isStreaming);
-  const mediaTokens = activeTokens.filter((t) => t.type === 'media');
+  // Memoize tokens to prevent redundant regex parsing on unrelated state changes
+  const activeTokens: MarkdownToken[] = useMemo(() => {
+    return tokenizeStreamingMarkdown(streamedText, isStreaming);
+  }, [streamedText, isStreaming]);
+
+  const mediaTokens = useMemo(() => {
+    return activeTokens.filter((t) => t.type === 'media');
+  }, [activeTokens]);
+
+  const handleSidebarMediaClick = async (query: string, fallbackUrl?: string) => {
+    setInspectMedia({ query, title: query, status: 'loading' });
+    const resolved = await resolveMedia(query, fallbackUrl);
+    setInspectMedia(resolved);
+  };
 
   return (
     <div className="min-h-screen bg-[#090a0d] text-[#e5e7eb] flex flex-col justify-center items-center p-3 sm:p-4 md:p-6 selection:bg-amber-500/20 selection:text-amber-300">
@@ -645,13 +647,7 @@ export default function PlaygroundPage() {
                     {mediaTokens.map((token, idx) => (
                       <div
                         key={idx}
-                        onClick={() =>
-                          setInspectMedia({
-                            query: token.query,
-                            title: token.query,
-                            status: 'loaded',
-                          })
-                        }
+                        onClick={() => handleSidebarMediaClick(token.query, token.fallbackUrl)}
                         className="p-2.5 rounded-lg bg-black/40 border border-white/10 hover:border-amber-400/40 cursor-pointer flex items-center justify-between transition-all group"
                       >
                         <div className="flex items-center gap-2 min-w-0">
