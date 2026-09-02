@@ -3,13 +3,11 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  RotateCcw,
   Sliders,
   Image as ImageIcon,
   Sparkles,
   ChevronRight,
   Send,
-  Zap,
   Shuffle,
   Key,
   X,
@@ -71,7 +69,6 @@ export default function PlaygroundPage() {
   const [capsuleSettings, setCapsuleSettings] = useState<CapsuleSettings>(DEFAULT_CAPSULE_SETTINGS);
   const [inspectMedia, setInspectMedia] = useState<ResolvedMedia | null>(null);
 
-  const fullTextToStream = selectedPreset.response;
   const streamTimerRef = useRef<NodeJS.Timeout | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -125,16 +122,6 @@ export default function PlaygroundPage() {
         setStreamedText(fullContent.slice(0, currentIndex));
       }
     }, streamSpeed);
-  };
-
-  const handleInstantReveal = () => {
-    stopStreaming();
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-    if (fullTextToStream) {
-      setStreamedText(fullTextToStream);
-    }
   };
 
   // Live streaming directly from Google Gemini API
@@ -338,28 +325,6 @@ export default function PlaygroundPage() {
         {/* Preset & Control Action Bar */}
         <section className="flex items-center justify-between gap-2 overflow-x-auto pb-1 scrollbar-none">
           <div className="flex items-center gap-1.5 shrink-0">
-            {/* Shuffle Action Button */}
-            <button
-              type="button"
-              onClick={handleShuffle}
-              disabled={isShuffling}
-              className={`group flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-white/5 border border-white/10 text-zinc-300 hover:text-amber-300 hover:border-amber-400/40 hover:bg-white/10 active:scale-95 transition-all shrink-0 ${
-                isShuffling ? 'opacity-70 cursor-wait' : ''
-              }`}
-              title="Shuffle to random AI-generated Nature & Science prompt"
-            >
-              <Shuffle
-                className={`w-3.5 h-3.5 transition-all duration-300 ${
-                  isShuffling
-                    ? 'animate-spin text-amber-400'
-                    : 'text-zinc-400 group-hover:text-amber-400 group-hover:rotate-180'
-                }`}
-              />
-              <span>{isShuffling ? 'Inventing...' : 'Shuffle'}</span>
-            </button>
-
-            <span className="text-zinc-600 mx-0.5">|</span>
-
             {/* Presets List */}
             {PRESETS.map((preset) => {
               const isSelected = selectedPreset.id === preset.id;
@@ -437,37 +402,25 @@ export default function PlaygroundPage() {
                 </div>
               </div>
 
-              {/* Streaming Playback Controls */}
-              <div className="flex items-center gap-1 shrink-0 bg-black/40 p-1 rounded-lg border border-white/10">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (apiKey.trim()) {
-                      streamFromGemini(
-                        selectedPreset.prompt,
-                        selectedPreset.title,
-                        selectedPreset.category,
-                        selectedPreset.icon
-                      );
-                    } else if (selectedPreset.response) {
-                      startStreaming(selectedPreset.response);
-                    }
-                  }}
-                  className="p-1 rounded-md hover:bg-white/10 text-zinc-300 hover:text-white transition-colors"
-                  title="Replay Stream"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={handleInstantReveal}
-                  className="px-2 py-0.5 rounded-md text-[11px] font-mono hover:bg-white/10 text-zinc-300 hover:text-white transition-colors flex items-center gap-1"
-                  title="Instant reveal"
-                >
-                  <Zap className="w-3 h-3 text-amber-400" />
-                  Instant
-                </button>
-              </div>
+              {/* Shuffle Action Button */}
+              <button
+                type="button"
+                onClick={handleShuffle}
+                disabled={isShuffling}
+                className={`group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-white/5 border border-white/10 text-zinc-300 hover:text-amber-300 hover:border-amber-400/40 hover:bg-white/10 active:scale-95 transition-all shrink-0 shadow-sm ${
+                  isShuffling ? 'opacity-70 cursor-wait' : ''
+                }`}
+                title="Shuffle to random AI-generated Nature & Science prompt"
+              >
+                <Shuffle
+                  className={`w-3.5 h-3.5 transition-all duration-300 ${
+                    isShuffling
+                      ? 'animate-spin text-amber-400'
+                      : 'text-zinc-400 group-hover:text-amber-400 group-hover:rotate-180'
+                  }`}
+                />
+                <span>{isShuffling ? 'Inventing...' : 'Shuffle'}</span>
+              </button>
             </div>
 
             {/* Stream View Area */}
