@@ -2,6 +2,54 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 
+async function searchDuckDuckGo(
+  query: string
+): Promise<{ title: string; imageUrl: string; sourceUrl: string } | null> {
+  const userAgent =
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
+
+  try {
+    const tokenUrl = `https://duckduckgo.com/?q=${encodeURIComponent(query)}&iax=images&ia=images`;
+    const tokenRes = await fetch(tokenUrl, {
+      headers: { 'User-Agent': userAgent },
+      cache: 'no-store',
+    });
+
+    if (!tokenRes.ok) return null;
+    const html = await tokenRes.text();
+    const vqdMatch = html.match(/vqd=["']?([0-9-_]+)["']?/) || html.match(/vqd=([0-9-_]+)/);
+    if (!vqdMatch) return null;
+
+    const vqd = vqdMatch[1];
+    const imgApiUrl = `https://duckduckgo.com/i.js?l=us-en&o=json&q=${encodeURIComponent(
+      query
+    )}&vqd=${vqd}&f=,,,&p=1`;
+
+    const imgRes = await fetch(imgApiUrl, {
+      headers: {
+        'User-Agent': userAgent,
+        Referer: 'https://duckduckgo.com/',
+      },
+      cache: 'no-store',
+    });
+
+    if (!imgRes.ok) return null;
+    const imgData = await imgRes.json();
+    const first = imgData.results?.[0];
+
+    if (first && (first.thumbnail || first.image)) {
+      return {
+        title: first.title || query,
+        imageUrl: first.thumbnail || first.image,
+        sourceUrl: first.url || `https://duckduckgo.com/?q=${encodeURIComponent(query)}`,
+      };
+    }
+  } catch (err) {
+    console.error('[DuckDuckGo Search] Error:', err);
+  }
+  return null;
+}
+
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const query = searchParams.get('q');
@@ -132,6 +180,19 @@ export async function GET(request: NextRequest) {
               description = simpPage.extract ? simpPage.extract.slice(0, 220) + '...' : description;
             }
           }
+        }
+      }
+    }
+
+    // LAYER 4: DuckDuckGo Live Web Image Search (Universal free fallback for modern topics, gadgets, culture)
+    if (!rawImageUrl) {
+      const ddgResult = await searchDuckDuckGo(cleanQuery);
+      if (ddgResult) {
+        rawImageUrl = ddgResult.imageUrl;
+        resolvedTitle = ddgResult.title || cleanQuery;
+        resolvedSourceUrl = ddgResult.sourceUrl;
+        if (!description || description.includes('Public domain')) {
+          description = `Live visual result for "${cleanQuery}" via DuckDuckGo web search.`;
         }
       }
     }
