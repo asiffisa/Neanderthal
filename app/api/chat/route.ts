@@ -44,7 +44,14 @@ export async function POST(request: NextRequest) {
 
     const requestedModel = body.model?.trim() || 'gemini-3.8-flash';
     const candidateModels = Array.from(
-      new Set([requestedModel, 'gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-2.5-flash', 'gemini-1.5-flash'])
+      new Set([
+        requestedModel,
+        'gemini-3.8-flash',
+        'gemini-3.6-flash',
+        'gemini-3.5-flash-lite',
+        'gemini-2.5-flash',
+        'gemini-1.5-flash',
+      ])
     );
 
     let geminiRes: Response | null = null;

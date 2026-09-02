@@ -32,6 +32,24 @@ import { tokenizeStreamingMarkdown } from '../src/core/tokenizer';
 import { StreamingMarkdownView } from '../src/components/StreamingMarkdownView';
 import { MediaLightbox } from '../src/components/MediaLightbox';
 
+function getModelShortLabel(id: string): string {
+  if (id === 'gemini-3.8-flash') return 'Gemini 3.8';
+  if (id === 'gemini-3.6-flash') return 'Gemini 3.6';
+  if (id === 'gemini-3.5-flash-lite') return 'Gemini 3.5 Lite';
+  if (id === 'gemini-2.5-flash') return 'Gemini 2.5';
+  if (id === 'gemini-1.5-flash') return 'Gemini 1.5';
+  return 'Gemini';
+}
+
+function getModelFullLabel(id: string): string {
+  if (id === 'gemini-3.8-flash') return 'Gemini 3.8 Flash';
+  if (id === 'gemini-3.6-flash') return 'Gemini 3.6 Flash';
+  if (id === 'gemini-3.5-flash-lite') return 'Gemini 3.5 Flash Lite';
+  if (id === 'gemini-2.5-flash') return 'Gemini 2.5 Flash';
+  if (id === 'gemini-1.5-flash') return 'Gemini 1.5 Flash';
+  return 'Gemini Flash';
+}
+
 export default function PlaygroundPage() {
   // Preset & Input state
   const [selectedPreset, setSelectedPreset] = useState<PresetQuestion>(PRESETS[0]);
@@ -145,7 +163,7 @@ export default function PlaygroundPage() {
     setStreamedText('');
     setApiError(null);
 
-    const modelLabel = selectedModel === 'gemini-3.8-flash' ? 'Gemini 3.8' : 'Gemini 3.6';
+    const modelLabel = getModelShortLabel(selectedModel);
 
     setSelectedPreset({
       id: 'live-' + Date.now(),
@@ -317,7 +335,7 @@ export default function PlaygroundPage() {
             >
               <Key className="w-3 h-3 text-amber-400" />
               <span className="hidden sm:inline">
-                {apiKey ? (selectedModel === 'gemini-3.8-flash' ? 'Gemini 3.8' : 'Gemini 3.6') : 'Add Key'}
+                {apiKey ? getModelShortLabel(selectedModel) : 'Add Key'}
               </span>
               <span
                 className={`w-1.5 h-1.5 rounded-full ${
@@ -411,7 +429,7 @@ export default function PlaygroundPage() {
                 <div className="flex items-center gap-2.5 text-xs text-zinc-400 py-8 justify-center animate-pulse">
                   <Sparkles className="w-4 h-4 text-amber-400 animate-spin" />
                   <span>
-                    {selectedModel === 'gemini-3.8-flash' ? 'Gemini 3.8 Flash' : 'Gemini 3.6 Flash'} is
+                    {getModelFullLabel(selectedModel)} is
                     generating insights with visual capsules...
                   </span>
                 </div>
@@ -780,6 +798,7 @@ export default function PlaygroundPage() {
                 >
                   <option value="gemini-3.8-flash">Gemini 3.8 Flash (Latest Flagship)</option>
                   <option value="gemini-3.6-flash">Gemini 3.6 Flash</option>
+                  <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash Lite</option>
                   <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
                   <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
                 </select>
