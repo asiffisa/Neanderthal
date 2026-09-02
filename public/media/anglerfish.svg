@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="100%" height="100%">
+  <defs>
+    <radialGradient id="escaGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#34d399" stop-opacity="1"/>
+      <stop offset="35%" stop-color="#059669" stop-opacity="0.7"/>
+      <stop offset="100%" stop-color="#022c22" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="400" height="300" fill="#030712"/>
+  <!-- Glowing Lure (Esca) -->
+  <circle cx="270" cy="70" r="40" fill="url(#escaGlow)"/>
+  <circle cx="270" cy="70" r="10" fill="#a7f3d0"/>
+  <!-- Illicium stalk -->
+  <path d="M 180 120 Q 230 40 270 70" stroke="#059669" stroke-width="3.5" fill="none"/>
+  <!-- Anglerfish Body -->
+  <path d="M 120 170 C 130 110, 220 120, 240 160 C 250 180, 240 220, 200 230 C 160 235, 120 210, 120 170 Z" fill="#111827" stroke="#374151" stroke-width="2.5"/>
+  <!-- Jaws & Needle-like Teeth -->
+  <path d="M 240 160 L 265 190 L 220 210 Z" fill="#030712" stroke="#4b5563" stroke-width="2"/>
+  <path d="M 235 165 L 240 180 M 245 170 L 248 185 M 255 178 L 253 192" stroke="#f3f4f6" stroke-width="2"/>
+  <!-- Tiny Eye -->
+  <circle cx="205" cy="145" r="4" fill="#059669"/>
+  <!-- Label Tag -->
+  <rect x="20" y="245" width="135" height="32" rx="8" fill="#ffffff" fill-opacity="0.08" stroke="#ffffff" stroke-opacity="0.15"/>
+  <text x="32" y="266" fill="#34d399" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="12" font-weight="700" letter-spacing="1">ANGLERFISH</text>
+</svg>

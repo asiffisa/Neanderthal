@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#181512"/>
+      <stop offset="100%" stop-color="#0a0908"/>
+    </linearGradient>
+    <linearGradient id="bone" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e8d8be"/>
+      <stop offset="50%" stop-color="#c4b090"/>
+      <stop offset="100%" stop-color="#8a7558"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#d97706" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#000" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="400" height="300" fill="url(#bg)"/>
+  <circle cx="200" cy="150" r="130" fill="url(#glow)"/>
+  <!-- Cranium Outline (Prominent brow ridge, sloping forehead, occipital bun) -->
+  <path d="M 120 180 C 100 160, 90 120, 120 90 C 150 60, 240 50, 280 80 C 310 100, 320 140, 300 170 C 290 185, 270 190, 250 185 C 230 200, 210 225, 180 230 C 150 235, 140 210, 130 195 Z" fill="url(#bone)" stroke="#453828" stroke-width="3"/>
+  <!-- Eye Orbit (Large & Rounded) -->
+  <ellipse cx="155" cy="140" rx="28" ry="24" fill="#120e0a" stroke="#453828" stroke-width="2"/>
+  <!-- Nasal Aperture (Broad & Projecting) -->
+  <path d="M 125 155 L 140 185 L 122 192 Z" fill="#120e0a"/>
+  <!-- Heavy Supraorbital Torus (Brow ridge) -->
+  <path d="M 125 120 Q 155 110 190 125" stroke="#ffe8cc" stroke-width="6" fill="none" stroke-linecap="round" opacity="0.8"/>
+  <!-- Cheekbone & Maxilla -->
+  <path d="M 185 160 Q 210 170 230 160" stroke="#785e3a" stroke-width="3" fill="none"/>
+  <!-- Archaic Zygomatic Arch -->
+  <path d="M 180 155 C 220 150, 250 170, 270 160" stroke="#52402b" stroke-width="4" fill="none"/>
+  <!-- Label Tag -->
+  <rect x="20" y="245" width="160" height="32" rx="8" fill="#ffffff" fill-opacity="0.08" stroke="#ffffff" stroke-opacity="0.15"/>
+  <text x="32" y="266" fill="#f59e0b" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="13" font-weight="700" letter-spacing="1">NEANDERTHAL</text>
+</svg>
