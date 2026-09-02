@@ -58,6 +58,8 @@ export default function PlaygroundPage() {
   const [showKeyModal, setShowKeyModal] = useState<boolean>(false);
   const [isLiveGenerating, setIsLiveGenerating] = useState<boolean>(false);
   const [apiError, setApiError] = useState<string | null>(null);
+  const [isShuffling, setIsShuffling] = useState<boolean>(false);
+  const [recentTitles, setRecentTitles] = useState<string[]>([]);
 
   // Streaming state
   const [streamedText, setStreamedText] = useState('');
@@ -204,16 +206,66 @@ export default function PlaygroundPage() {
     }
   };
 
-  // Shuffle button handler: picks a random nature/science preset
-  const handleShuffle = () => {
-    const available = PRESETS.filter((p) => p.id !== selectedPreset.id);
-    const random = available[Math.floor(Math.random() * available.length)] || PRESETS[0];
-    setSelectedPreset(random);
+  // Shuffle button handler: queries Gemini LLM to invent an unpredictable, non-repeating scientific mystery
+  const handleShuffle = async () => {
+    if (isShuffling) return;
+    setIsShuffling(true);
 
-    if (apiKey.trim()) {
-      streamFromGemini(random.prompt, random.title, random.category, random.icon);
-    } else {
-      startStreaming(random.response);
+    try {
+      const res = await fetch('/api/random-question', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          apiKey,
+          model: selectedModel,
+          excludeTitles: recentTitles,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const { title, category, icon, prompt } = data;
+
+        // Remember recent titles to prevent repetitive loops
+        setRecentTitles((prev) => [...prev.slice(-15), title]);
+
+        const newQuestion: PresetQuestion = {
+          id: 'shuffle-' + Date.now(),
+          title,
+          category,
+          icon,
+          prompt,
+          response: '',
+        };
+        setSelectedPreset(newQuestion);
+
+        if (apiKey.trim()) {
+          // Stream comprehensive answer with high-density visual media capsules directly from Gemini
+          await streamFromGemini(prompt, title, category, icon);
+        } else {
+          // If offline / no key, find if there is a matching preset or inform user
+          const matchingPreset = PRESETS.find((p) => p.title.toLowerCase() === title.toLowerCase());
+          if (matchingPreset) {
+            startStreaming(matchingPreset.response);
+          } else {
+            const fallbackAnswer = `Explore the fascinating science of **${title}** ![media:${title}]. Connect your free Google Gemini API key above to generate unscripted live research streaming with high-density visual media capsules for this topic.`;
+            startStreaming(fallbackAnswer);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('[Shuffle Error]:', err);
+      // Fallback to non-repeating preset from local bank
+      const available = PRESETS.filter((p) => p.id !== selectedPreset.id);
+      const random = available[Math.floor(Math.random() * available.length)] || PRESETS[0];
+      setSelectedPreset(random);
+      if (apiKey.trim()) {
+        streamFromGemini(random.prompt, random.title, random.category, random.icon);
+      } else {
+        startStreaming(random.response);
+      }
+    } finally {
+      setIsShuffling(false);
     }
   };
 
@@ -286,11 +338,20 @@ export default function PlaygroundPage() {
             <button
               type="button"
               onClick={handleShuffle}
-              className="group flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-white/5 border border-white/10 text-zinc-300 hover:text-amber-300 hover:border-amber-400/40 hover:bg-white/10 active:scale-95 transition-all shrink-0"
-              title="Shuffle to random Nature & Science prompt"
+              disabled={isShuffling}
+              className={`group flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-white/5 border border-white/10 text-zinc-300 hover:text-amber-300 hover:border-amber-400/40 hover:bg-white/10 active:scale-95 transition-all shrink-0 ${
+                isShuffling ? 'opacity-70 cursor-wait' : ''
+              }`}
+              title="Shuffle to random AI-generated Nature & Science prompt"
             >
-              <Shuffle className="w-3.5 h-3.5 text-zinc-400 group-hover:text-amber-400 group-hover:rotate-180 transition-all duration-300" />
-              <span>Shuffle</span>
+              <Shuffle
+                className={`w-3.5 h-3.5 transition-all duration-300 ${
+                  isShuffling
+                    ? 'animate-spin text-amber-400'
+                    : 'text-zinc-400 group-hover:text-amber-400 group-hover:rotate-180'
+                }`}
+              />
+              <span>{isShuffling ? 'Inventing...' : 'Shuffle'}</span>
             </button>
 
             <span className="text-zinc-600 mx-0.5">|</span>
