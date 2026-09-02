@@ -37,6 +37,7 @@ export const StreamingMarkdownView: React.FC<StreamingMarkdownViewProps> = memo(
           <InlineCapsule
             key={token.id || `token-${idx}`}
             query={token.query}
+            vendorPreference={token.vendorPreference}
             fallbackUrl={token.fallbackUrl}
             isPartial={token.isPartial}
             settings={settings}

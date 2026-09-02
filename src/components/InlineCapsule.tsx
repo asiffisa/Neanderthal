@@ -10,6 +10,7 @@ import { resolveMedia } from '../lib/wikimedia';
 interface InlineCapsuleProps {
   query: string;
   fallbackUrl?: string;
+  vendorPreference?: 'wikipedia' | 'duckduckgo' | 'auto';
   isPartial?: boolean;
   settings: CapsuleSettings;
   onInspect?: (media: ResolvedMedia) => void;
@@ -18,6 +19,7 @@ interface InlineCapsuleProps {
 export const InlineCapsule: React.FC<InlineCapsuleProps> = memo(({
   query,
   fallbackUrl,
+  vendorPreference = 'auto',
   isPartial = false,
   settings,
   onInspect,
@@ -56,7 +58,7 @@ export const InlineCapsule: React.FC<InlineCapsuleProps> = memo(({
 
     let isCurrent = true;
 
-    resolveMedia(query, fallbackUrl).then((res) => {
+    resolveMedia(query, fallbackUrl, vendorPreference).then((res) => {
       if (isCurrent) {
         setMedia(res);
       }
@@ -65,7 +67,7 @@ export const InlineCapsule: React.FC<InlineCapsuleProps> = memo(({
     return () => {
       isCurrent = false;
     };
-  }, [query, fallbackUrl, isPartial]);
+  }, [query, fallbackUrl, vendorPreference, isPartial]);
 
   const handleMouseEnter = () => {
     if (!settings.showHoverCard) return;
@@ -230,8 +232,14 @@ export const InlineCapsule: React.FC<InlineCapsuleProps> = memo(({
               <span className="block text-sm font-semibold text-white tracking-tight leading-snug">
                 {media.title || query}
               </span>
-              <span className="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/20 shrink-0">
-                wiki
+              <span
+                className={`text-[10px] font-mono uppercase px-1.5 py-0.5 rounded border shrink-0 ${
+                  media.vendor === 'duckduckgo'
+                    ? 'bg-sky-500/15 text-sky-300 border-sky-500/30'
+                    : 'bg-amber-500/15 text-amber-300 border-amber-500/20'
+                }`}
+              >
+                {media.vendor === 'duckduckgo' ? 'DuckDuckGo' : 'Wikipedia'}
               </span>
             </div>
 
@@ -250,10 +258,14 @@ export const InlineCapsule: React.FC<InlineCapsuleProps> = memo(({
                   href={media.sourceUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-amber-400 hover:text-amber-300 font-medium transition-colors"
+                  className={`inline-flex items-center gap-1 font-medium transition-colors ${
+                    media.vendor === 'duckduckgo'
+                      ? 'text-sky-400 hover:text-sky-300'
+                      : 'text-amber-400 hover:text-amber-300'
+                  }`}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  Wikipedia
+                  {media.vendor === 'duckduckgo' ? 'DuckDuckGo Web' : 'Wikipedia'}
                   <ExternalLink className="w-3 h-3" />
                 </a>
               )}

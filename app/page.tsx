@@ -322,9 +322,13 @@ export default function PlaygroundPage() {
     return activeTokens.filter((t) => t.type === 'media');
   }, [activeTokens]);
 
-  const handleSidebarMediaClick = async (query: string, fallbackUrl?: string) => {
+  const handleSidebarMediaClick = async (
+    query: string,
+    fallbackUrl?: string,
+    vendorPreference?: 'wikipedia' | 'duckduckgo' | 'auto'
+  ) => {
     setInspectMedia({ query, title: query, status: 'loading' });
-    const resolved = await resolveMedia(query, fallbackUrl);
+    const resolved = await resolveMedia(query, fallbackUrl, vendorPreference);
     setInspectMedia(resolved);
   };
 
@@ -708,18 +712,35 @@ export default function PlaygroundPage() {
                     {mediaTokens.map((token, idx) => (
                       <div
                         key={idx}
-                        onClick={() => handleSidebarMediaClick(token.query, token.fallbackUrl)}
+                        onClick={() =>
+                          handleSidebarMediaClick(
+                            token.query,
+                            token.fallbackUrl,
+                            token.vendorPreference
+                          )
+                        }
                         className="p-2.5 rounded-lg bg-black/40 border border-white/10 hover:border-amber-400/40 cursor-pointer flex items-center justify-between transition-all group"
                       >
                         <div className="flex items-center gap-2 min-w-0">
                           <span className="w-5 h-5 rounded-md bg-amber-500/20 text-amber-400 flex items-center justify-center text-[10px] font-bold">
                             {idx + 1}
                           </span>
-                          <span className="font-medium text-white truncate max-w-[180px]">
+                          <span className="font-medium text-white truncate max-w-[150px]">
                             {token.query}
                           </span>
                         </div>
-                        <ChevronRight className="w-4 h-4 text-zinc-500 group-hover:text-amber-400 transition-colors" />
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span
+                            className={`text-[9px] font-mono uppercase px-1.5 py-0.5 rounded border ${
+                              token.vendorPreference === 'duckduckgo'
+                                ? 'bg-sky-500/15 text-sky-300 border-sky-500/30'
+                                : 'bg-amber-500/15 text-amber-300 border-amber-500/20'
+                            }`}
+                          >
+                            {token.vendorPreference === 'duckduckgo' ? 'DDG' : 'Wiki'}
+                          </span>
+                          <ChevronRight className="w-4 h-4 text-zinc-500 group-hover:text-amber-400 transition-colors" />
+                        </div>
                       </div>
                     ))}
                   </div>

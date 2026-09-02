@@ -80,13 +80,24 @@ export const MediaLightbox: React.FC<MediaLightboxProps> = ({ media, onClose }) 
 
           {/* Content & Metadata */}
           <div className="p-5 space-y-3">
-            <div>
-              <span className="text-[11px] font-mono uppercase tracking-wider text-amber-400/90 font-medium">
-                Query Token
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-[11px] font-mono uppercase tracking-wider text-amber-400/90 font-medium">
+                  Query Token
+                </span>
+                <p className="font-mono text-xs text-zinc-300 bg-black/40 px-2.5 py-1.5 rounded-md border border-white/10 mt-1 inline-block">
+                  ![media:{media.query}]
+                </p>
+              </div>
+              <span
+                className={`text-xs font-mono uppercase px-2.5 py-1 rounded-md border font-medium ${
+                  media.vendor === 'duckduckgo'
+                    ? 'bg-sky-500/15 text-sky-300 border-sky-500/30'
+                    : 'bg-amber-500/15 text-amber-300 border-amber-500/20'
+                }`}
+              >
+                {media.vendor === 'duckduckgo' ? 'DuckDuckGo Web' : 'Wikipedia'}
               </span>
-              <p className="font-mono text-xs text-zinc-300 bg-black/40 px-2.5 py-1.5 rounded-md border border-white/10 mt-1 inline-block">
-                ![media:{media.query}]
-              </p>
             </div>
 
             {media.description && (
@@ -108,8 +119,10 @@ export const MediaLightbox: React.FC<MediaLightboxProps> = ({ media, onClose }) 
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-white/10 hover:bg-white/15 text-sm font-medium text-white transition-colors border border-white/10"
                 >
-                  Read Full Article on Wikipedia
-                  <ExternalLink className="w-4 h-4 text-amber-400" />
+                  {media.vendor === 'duckduckgo' ? 'View Source on DuckDuckGo' : 'Read Full Article on Wikipedia'}
+                  <ExternalLink
+                    className={`w-4 h-4 ${media.vendor === 'duckduckgo' ? 'text-sky-400' : 'text-amber-400'}`}
+                  />
                 </a>
               </div>
             )}

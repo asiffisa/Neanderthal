@@ -58,6 +58,7 @@ interface ServerCacheEntry {
     thumbnailUrl: string;
     fullImageUrl: string;
     sourceUrl: string;
+    vendor: 'wikipedia' | 'duckduckgo';
     status: string;
   };
   timestamp: number;
@@ -70,13 +71,17 @@ const MAX_CACHE_SIZE = 500;
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const query = searchParams.get('q');
+  const requestedVendor =
+    searchParams.get('source')?.toLowerCase() ||
+    searchParams.get('vendor')?.toLowerCase() ||
+    'auto';
 
   if (!query || !query.trim()) {
     return NextResponse.json({ error: 'Missing query parameter q' }, { status: 400 });
   }
 
   const cleanQuery = query.trim();
-  const cacheKey = cleanQuery.toLowerCase();
+  const cacheKey = `${cleanQuery.toLowerCase()}:${requestedVendor}`;
 
   const cached = serverResolveCache.get(cacheKey);
   if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
@@ -91,20 +96,39 @@ export async function GET(request: NextRequest) {
   try {
     const userAgent = 'NeanderthalApp/1.0 (https://github.com/asif/neanderthal; contact@neanderthal-demo.com)';
 
-    // LAYER 1: Query exact Wikipedia article for lead thumbnail AND content images
-    const mediaWikiUrl = `https://en.wikipedia.org/w/api.php?action=query&prop=pageimages|extracts|images&exintro&explaintext&redirects=1&titles=${encodeURIComponent(
-      cleanQuery
-    )}&pithumbsize=600&imlimit=25&format=json&origin=*`;
-
     let description = 'Public domain scientific knowledge reference.';
     let resolvedTitle = cleanQuery;
     let resolvedSourceUrl = `https://en.wikipedia.org/wiki/${encodeURIComponent(cleanQuery)}`;
     let rawImageUrl: string | null = null;
+    let resolvedVendor: 'wikipedia' | 'duckduckgo' = 'wikipedia';
 
-    const res = await fetch(mediaWikiUrl, {
-      headers: { 'User-Agent': userAgent },
-      cache: 'no-store',
-    });
+    // VENDOR ROUTING: If AI chose DuckDuckGo (or web), prioritize DuckDuckGo live web search
+    const wantsDuckDuckGo =
+      requestedVendor === 'duckduckgo' ||
+      requestedVendor === 'ddg' ||
+      requestedVendor === 'web';
+
+    if (wantsDuckDuckGo) {
+      const ddgResult = await searchDuckDuckGo(cleanQuery);
+      if (ddgResult) {
+        rawImageUrl = ddgResult.imageUrl;
+        resolvedTitle = ddgResult.title || cleanQuery;
+        resolvedSourceUrl = ddgResult.sourceUrl;
+        description = `Live web photography for "${cleanQuery}" via DuckDuckGo.`;
+        resolvedVendor = 'duckduckgo';
+      }
+    }
+
+    // LAYER 1: Query exact Wikipedia article for lead thumbnail AND content images (if not already resolved via DDG)
+    if (!rawImageUrl) {
+      const mediaWikiUrl = `https://en.wikipedia.org/w/api.php?action=query&prop=pageimages|extracts|images&exintro&explaintext&redirects=1&titles=${encodeURIComponent(
+        cleanQuery
+      )}&pithumbsize=600&imlimit=25&format=json&origin=*`;
+
+      const res = await fetch(mediaWikiUrl, {
+        headers: { 'User-Agent': userAgent },
+        cache: 'no-store',
+      });
 
     if (res.ok) {
       const data = await res.json();
@@ -158,6 +182,7 @@ export async function GET(request: NextRequest) {
         }
       }
     }
+  }
 
     // LAYER 2: If no image found yet, search Wikimedia Commons
     if (!rawImageUrl) {
@@ -219,6 +244,7 @@ export async function GET(request: NextRequest) {
         rawImageUrl = ddgResult.imageUrl;
         resolvedTitle = ddgResult.title || cleanQuery;
         resolvedSourceUrl = ddgResult.sourceUrl;
+        resolvedVendor = 'duckduckgo';
         if (!description || description.includes('Public domain')) {
           description = `Live visual result for "${cleanQuery}" via DuckDuckGo web search.`;
         }
@@ -237,6 +263,7 @@ export async function GET(request: NextRequest) {
         thumbnailUrl,
         fullImageUrl: thumbnailUrl,
         sourceUrl: resolvedSourceUrl,
+        vendor: resolvedVendor,
         status: 'loaded',
       };
 

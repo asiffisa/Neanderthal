@@ -9,6 +9,7 @@ export interface ResolvedMedia {
   sourceUrl?: string;
   width?: number;
   height?: number;
+  vendor?: 'wikipedia' | 'duckduckgo';
   status: 'loading' | 'loaded' | 'not-found' | 'error';
 }
 
@@ -22,6 +23,7 @@ export type MarkdownToken =
       raw: string;
       query: string;
       mediaType?: MediaType;
+      vendorPreference?: 'wikipedia' | 'duckduckgo' | 'auto';
       fallbackUrl?: string;
       id: string;
       isPartial?: boolean;

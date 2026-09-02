@@ -31,7 +31,20 @@ export function tokenizeStreamingMarkdown(text: string, isStreaming: boolean = f
       });
     }
 
-    const query = match[1].trim();
+    let query = match[1].trim();
+    let vendorPreference: 'wikipedia' | 'duckduckgo' | 'auto' = 'auto';
+
+    if (query.includes('|')) {
+      const parts = query.split('|');
+      query = parts[0].trim();
+      const pref = parts[1]?.trim().toLowerCase();
+      if (pref === 'duckduckgo' || pref === 'ddg' || pref === 'web') {
+        vendorPreference = 'duckduckgo';
+      } else if (pref === 'wiki' || pref === 'wikipedia') {
+        vendorPreference = 'wikipedia';
+      }
+    }
+
     const fallbackUrl = match[2]?.trim();
 
     tokens.push({
@@ -39,6 +52,7 @@ export function tokenizeStreamingMarkdown(text: string, isStreaming: boolean = f
       raw: match[0],
       query,
       mediaType: 'image',
+      vendorPreference,
       fallbackUrl,
       id: `media-${matchStart}-${encodeURIComponent(query).slice(0, 20)}`,
     });
@@ -61,7 +75,20 @@ export function tokenizeStreamingMarkdown(text: string, isStreaming: boolean = f
         });
       }
 
-      const partialQuery = partialMatch[1].trim();
+      let partialQuery = partialMatch[1].trim();
+      let partialVendorPreference: 'wikipedia' | 'duckduckgo' | 'auto' = 'auto';
+
+      if (partialQuery.includes('|')) {
+        const parts = partialQuery.split('|');
+        partialQuery = parts[0].trim();
+        const pref = parts[1]?.trim().toLowerCase();
+        if (pref === 'duckduckgo' || pref === 'ddg' || pref === 'web') {
+          partialVendorPreference = 'duckduckgo';
+        } else if (pref === 'wiki' || pref === 'wikipedia') {
+          partialVendorPreference = 'wikipedia';
+        }
+      }
+
       if (isStreaming) {
         // While streaming, render as an early resolving capsule so the bubble appears immediately
         tokens.push({
@@ -69,6 +96,7 @@ export function tokenizeStreamingMarkdown(text: string, isStreaming: boolean = f
           raw: partialMatch[0],
           query: partialQuery || 'Visualizing...',
           mediaType: 'image',
+          vendorPreference: partialVendorPreference,
           id: `media-streaming-${currentIndex}`,
           isPartial: true,
         });
@@ -79,6 +107,7 @@ export function tokenizeStreamingMarkdown(text: string, isStreaming: boolean = f
           raw: partialMatch[0],
           query: partialQuery,
           mediaType: 'image',
+          vendorPreference: partialVendorPreference,
           id: `media-healed-${currentIndex}`,
           isPartial: false,
         });

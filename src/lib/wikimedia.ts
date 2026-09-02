@@ -9,8 +9,12 @@ const inFlightRequests = new Map<string, Promise<ResolvedMedia>>();
  * Resolve media metadata from in-memory cache or Next.js live resolution API.
  * Deduplicates in-flight requests so simultaneous tokens share one network fetch.
  */
-export async function resolveMedia(query: string, fallbackUrl?: string): Promise<ResolvedMedia> {
-  const normalizedKey = query.trim().toLowerCase();
+export async function resolveMedia(
+  query: string,
+  fallbackUrl?: string,
+  vendorPreference: 'wikipedia' | 'duckduckgo' | 'auto' = 'auto'
+): Promise<ResolvedMedia> {
+  const normalizedKey = `${query.trim().toLowerCase()}:${vendorPreference}`;
 
   // 1. Check in-memory session cache
   if (memoryCache.has(normalizedKey)) {
@@ -25,7 +29,10 @@ export async function resolveMedia(query: string, fallbackUrl?: string): Promise
   // 3. Initiate fetch and store in-flight promise
   const fetchPromise = (async (): Promise<ResolvedMedia> => {
     try {
-      const res = await fetch(`/api/resolve?q=${encodeURIComponent(query)}`);
+      const url = `/api/resolve?q=${encodeURIComponent(query)}${
+        vendorPreference !== 'auto' ? `&source=${vendorPreference}` : ''
+      }`;
+      const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
         if (data && data.thumbnailUrl) {
@@ -38,6 +45,7 @@ export async function resolveMedia(query: string, fallbackUrl?: string): Promise
             sourceUrl: data.sourceUrl,
             width: data.width,
             height: data.height,
+            vendor: data.vendor || (data.sourceUrl?.includes('duckduckgo') ? 'duckduckgo' : 'wikipedia'),
             status: 'loaded',
           };
           memoryCache.set(normalizedKey, resolved);
@@ -56,6 +64,7 @@ export async function resolveMedia(query: string, fallbackUrl?: string): Promise
       title: query,
       thumbnailUrl: fallbackUrl,
       fullImageUrl: fallbackUrl,
+      vendor: vendorPreference === 'duckduckgo' ? 'duckduckgo' : 'wikipedia',
       status: fallbackUrl ? 'loaded' : 'not-found',
     };
 
