@@ -281,14 +281,14 @@ export default function PlaygroundPage() {
         {/* Preset & Control Action Bar */}
         <section className="flex items-center justify-between gap-2 overflow-x-auto pb-1 scrollbar-none">
           <div className="flex items-center gap-1.5 shrink-0">
-            {/* Shuffle Button */}
+            {/* Shuffle Action Button */}
             <button
               type="button"
               onClick={handleShuffle}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-amber-500/15 border border-amber-500/40 text-amber-300 hover:bg-amber-500/25 transition-all shrink-0 shadow-sm"
+              className="group flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-white/5 border border-white/10 text-zinc-300 hover:text-amber-300 hover:border-amber-400/40 hover:bg-white/10 active:scale-95 transition-all shrink-0"
               title="Shuffle to random Nature & Science prompt"
             >
-              <Shuffle className="w-3.5 h-3.5 text-amber-400" />
+              <Shuffle className="w-3.5 h-3.5 text-zinc-400 group-hover:text-amber-400 group-hover:rotate-180 transition-all duration-300" />
               <span>Shuffle</span>
             </button>
 
