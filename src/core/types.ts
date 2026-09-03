@@ -35,6 +35,7 @@ export interface CapsuleSettings {
   borderRadius: number; // in pixels, e.g. 8
   gap: number; // in pixels, e.g. 6
   verticalOffset: number; // in pixels, e.g. -2
+  visualsPerParagraph: number; // target visuals per paragraph, e.g. 3
   showHoverCard: boolean;
   hoverScale: boolean;
   opticalAlignment: 'middle' | 'baseline' | 'center';
@@ -45,7 +46,8 @@ export const DEFAULT_CAPSULE_SETTINGS: CapsuleSettings = {
   borderRadius: 8,
   gap: 6,
   verticalOffset: -2,
+  visualsPerParagraph: 5,
   showHoverCard: true,
-  hoverScale: true,
+  hoverScale: false,
   opticalAlignment: 'middle',
 };

@@ -22,6 +22,7 @@ import {
   ResolvedMedia,
 } from '../src/core/types';
 import { tokenizeStreamingMarkdown } from '../src/core/tokenizer';
+import { createNeanderthalMediaMarkdown } from '../src/core/media-markdown';
 import { resolveMedia } from '../src/lib/wikimedia';
 import { StreamingMarkdownView } from '../src/components/StreamingMarkdownView';
 import { MediaLightbox } from '../src/components/MediaLightbox';
@@ -66,11 +67,14 @@ export default function PlaygroundPage() {
 
   // Inspector & UI settings
   const [activeTab, setActiveTab] = useState<'design' | 'media'>('design');
-  const [capsuleSettings, setCapsuleSettings] = useState<CapsuleSettings>(DEFAULT_CAPSULE_SETTINGS);
+  const [capsuleSettings, setCapsuleSettings] = useState<CapsuleSettings>(() => ({
+    ...DEFAULT_CAPSULE_SETTINGS,
+  }));
   const [inspectMedia, setInspectMedia] = useState<ResolvedMedia | null>(null);
 
   const streamTimerRef = useRef<NodeJS.Timeout | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const streamContainerRef = useRef<HTMLDivElement | null>(null);
 
   // Load API key & model choice from localStorage on mount
   useEffect(() => {
@@ -109,6 +113,9 @@ export default function PlaygroundPage() {
     }
     setStreamedText('');
     setIsStreaming(true);
+    if (streamContainerRef.current) {
+      streamContainerRef.current.scrollTop = 0;
+    }
 
     let currentIndex = 0;
     const stepSize = 4; // chunk size for realistic LLM token burst
@@ -142,6 +149,9 @@ export default function PlaygroundPage() {
     setIsStreaming(true);
     setStreamedText('');
     setApiError(null);
+    if (streamContainerRef.current) {
+      streamContainerRef.current.scrollTop = 0;
+    }
 
     const modelLabel = getModelShortLabel(selectedModel);
 
@@ -158,7 +168,12 @@ export default function PlaygroundPage() {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: promptText, apiKey, model: selectedModel }),
+        body: JSON.stringify({
+          prompt: promptText,
+          apiKey,
+          model: selectedModel,
+          visualsPerParagraph: capsuleSettings.visualsPerParagraph,
+        }),
         signal: controller.signal,
       });
 
@@ -227,7 +242,7 @@ export default function PlaygroundPage() {
         setSelectedPreset(newQuestion);
 
         if (apiKey.trim()) {
-          // Stream comprehensive answer with high-density visual media capsules directly from Gemini
+          // Stream an answer with a small number of high-value visual capsules
           await streamFromGemini(prompt, title, category, icon);
         } else {
           // If offline / no key, find if there is a matching preset or inform user
@@ -235,7 +250,7 @@ export default function PlaygroundPage() {
           if (matchingPreset) {
             startStreaming(matchingPreset.response);
           } else {
-            const fallbackAnswer = `Explore the fascinating science of **${title}** ![media:${title}]. Connect your free Google Gemini API key above to generate unscripted live research streaming with high-density visual media capsules for this topic.`;
+            const fallbackAnswer = `Explore the fascinating science of **${title}** ${createNeanderthalMediaMarkdown(title)}. Connect your free Google Gemini API key above to generate unscripted live research with focused visual media capsules for this topic.`;
             startStreaming(fallbackAnswer);
           }
         }
@@ -272,9 +287,9 @@ export default function PlaygroundPage() {
         category: 'User Prompt',
         icon: '🔬',
         prompt: queryText,
-        response: queryText.includes('![media:')
+        response: queryText.includes('![media:') || queryText.includes('(neanderthal:')
           ? queryText
-          : `In the scientific study of **${queryText}** ![media:${queryText}], researchers analyze its biochemical, physical, and ecological significance in the natural world.`,
+          : `In the scientific study of **${queryText}** ${createNeanderthalMediaMarkdown(queryText)}, researchers analyze its biochemical, physical, and ecological significance in the natural world.`,
       };
       setSelectedPreset(newCustomPreset);
     }
@@ -308,6 +323,15 @@ export default function PlaygroundPage() {
   const mediaTokens = useMemo(() => {
     return activeTokens.filter((t) => t.type === 'media');
   }, [activeTokens]);
+
+  // Proactively pre-resolve media tokens in parallel as they stream in
+  useEffect(() => {
+    for (const token of mediaTokens) {
+      if (token.query && !token.isPartial) {
+        resolveMedia(token.query, token.fallbackUrl, token.vendorPreference);
+      }
+    }
+  }, [mediaTokens]);
 
   const handleSidebarMediaClick = async (
     query: string,
@@ -386,20 +410,11 @@ export default function PlaygroundPage() {
           <div className="rounded-2xl bg-[#111317] border border-white/10 shadow-2xl flex flex-col overflow-hidden">
             {/* Question Bar */}
             <div className="px-4 py-3 border-b border-white/10 bg-[#14161b] flex items-center justify-between gap-3">
-              <div className="flex items-start gap-2.5 min-w-0">
-                <span className="text-lg mt-0.5">{selectedPreset.icon}</span>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[10px] font-mono uppercase text-amber-400 font-semibold tracking-wider">
-                      {selectedPreset.category}
-                    </span>
-                    <span className="text-zinc-600">•</span>
-                    <span className="text-[11px] text-zinc-400">Prompt</span>
-                  </div>
-                  <p className="text-sm font-semibold text-white tracking-tight mt-0.5 truncate">
-                    {selectedPreset.prompt}
-                  </p>
-                </div>
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="text-lg shrink-0">{selectedPreset.icon}</span>
+                <p className="text-sm font-semibold text-white tracking-tight truncate min-w-0">
+                  {selectedPreset.prompt}
+                </p>
               </div>
 
               {/* Shuffle Action Button */}
@@ -424,7 +439,10 @@ export default function PlaygroundPage() {
             </div>
 
             {/* Stream View Area */}
-            <div className="p-4 md:p-5 overflow-y-auto min-h-[360px] max-h-[460px] text-[13.5px] leading-relaxed">
+            <div
+              ref={streamContainerRef}
+              className="p-4 md:p-5 overflow-y-auto h-[420px] text-[13.5px] leading-relaxed"
+            >
               {apiError && (
                 <div className="p-3 mb-3 rounded-xl bg-red-500/10 border border-red-500/30 flex items-start justify-between gap-3 text-xs text-red-300">
                   <div className="flex items-start gap-2 min-w-0">
@@ -460,39 +478,6 @@ export default function PlaygroundPage() {
                 settings={capsuleSettings}
                 onInspect={(m) => setInspectMedia(m)}
               />
-            </div>
-
-            {/* Stream Status Bar */}
-            <div className="px-4 py-2 bg-[#0e1014] border-t border-white/10 flex items-center justify-between text-[11px] text-zinc-400">
-              <div className="flex items-center gap-2.5">
-                <span className="flex items-center gap-1.5">
-                  <span
-                    className={`w-1.5 h-1.5 rounded-full ${
-                      isStreaming ? 'bg-amber-400 animate-ping' : 'bg-emerald-400'
-                    }`}
-                  />
-                  {isStreaming ? 'Streaming...' : 'Complete'}
-                </span>
-                <span className="text-zinc-600">|</span>
-                <span className="font-mono text-[10px] text-amber-400">
-                  {mediaTokens.length} visual{mediaTokens.length === 1 ? '' : 's'}
-                </span>
-              </div>
-
-              {/* Speed dropdown */}
-              <div className="flex items-center gap-1.5">
-                <span className="text-zinc-500">Speed:</span>
-                <select
-                  value={streamSpeed}
-                  onChange={(e) => setStreamSpeed(Number(e.target.value))}
-                  className="bg-black/60 border border-white/10 rounded px-1.5 py-0.5 text-[10px] text-zinc-300 focus:outline-none"
-                >
-                  <option value={60}>0.5x</option>
-                  <option value={30}>1x</option>
-                  <option value={15}>2x</option>
-                  <option value={5}>Turbo</option>
-                </select>
-              </div>
             </div>
           </div>
 
@@ -588,19 +573,31 @@ export default function PlaygroundPage() {
                       unit: 'px',
                       hint: 'Nudges capsule optically onto the text baseline.',
                     },
+                    {
+                      label: 'Visuals per Paragraph',
+                      key: 'visualsPerParagraph',
+                      value: capsuleSettings.visualsPerParagraph ?? DEFAULT_CAPSULE_SETTINGS.visualsPerParagraph,
+                      min: 1,
+                      max: 5,
+                      unit: ' / ¶',
+                      hint: 'Target visual capsule density for each paragraph.',
+                    },
                   ].map((ctrl) => (
                     <div key={ctrl.key}>
                       <div className="flex justify-between mb-1.5">
                         <span className="font-medium text-zinc-300">{ctrl.label}</span>
-                        <span className="font-mono text-amber-400">{ctrl.value}{ctrl.unit}</span>
+                        <span className="font-mono text-amber-400">{ctrl.value ?? ctrl.min}{ctrl.unit}</span>
                       </div>
                       <input
                         type="range"
                         min={ctrl.min}
                         max={ctrl.max}
-                        value={ctrl.value}
+                        value={ctrl.value ?? ctrl.min ?? 0}
                         onChange={(e) =>
-                          setCapsuleSettings({ ...capsuleSettings, [ctrl.key]: Number(e.target.value) })
+                          setCapsuleSettings((prev) => ({
+                            ...prev,
+                            [ctrl.key]: Number(e.target.value),
+                          }))
                         }
                         className="w-full accent-amber-400 cursor-pointer"
                       />
@@ -608,42 +605,10 @@ export default function PlaygroundPage() {
                     </div>
                   ))}
 
-                  <div className="pt-3 border-t border-white/10 space-y-3">
-                    <label className="flex items-center justify-between cursor-pointer">
-                      <span className="font-medium text-zinc-300">Hover Popover Card</span>
-                      <input
-                        type="checkbox"
-                        checked={capsuleSettings.showHoverCard}
-                        onChange={(e) =>
-                          setCapsuleSettings({
-                            ...capsuleSettings,
-                            showHoverCard: e.target.checked,
-                          })
-                        }
-                        className="rounded accent-amber-400 w-4 h-4 cursor-pointer"
-                      />
-                    </label>
-
-                    <label className="flex items-center justify-between cursor-pointer">
-                      <span className="font-medium text-zinc-300">Hover Spring Zoom</span>
-                      <input
-                        type="checkbox"
-                        checked={capsuleSettings.hoverScale}
-                        onChange={(e) =>
-                          setCapsuleSettings({
-                            ...capsuleSettings,
-                            hoverScale: e.target.checked,
-                          })
-                        }
-                        className="rounded accent-amber-400 w-4 h-4 cursor-pointer"
-                      />
-                    </label>
-                  </div>
-
                   <div className="pt-3 border-t border-white/10">
                     <button
                       type="button"
-                      onClick={() => setCapsuleSettings(DEFAULT_CAPSULE_SETTINGS)}
+                      onClick={() => setCapsuleSettings({ ...DEFAULT_CAPSULE_SETTINGS })}
                       className="w-full py-2 rounded-lg bg-white/5 hover:bg-white/10 text-zinc-300 font-medium transition-colors border border-white/10 text-xs"
                     >
                       Reset to Craft Defaults

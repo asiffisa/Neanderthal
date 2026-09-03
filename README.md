@@ -12,7 +12,7 @@
 
 ## ✨ Overview
 
-**Neanderthal** transforms reading into an interactive multimedia documentary. As Google Gemini streams answers to deep science and nature questions, the engine tokenizes key entities on the fly and integrates interactive, cap-height matched visual capsules directly into the text flow without layout shifts or jarring line jumps.
+**Neanderthal** transforms AI-authored Markdown into visual prose. As an answer streams, standard Markdown image nodes using the `neanderthal:` destination are upgraded into interactive, cap-height matched visual capsules directly inside the text flow.
 
 Hovering over any capsule reveals a detailed floating preview card with origin provenance, while clicking opens an immersive, high-resolution inspection lightbox.
 
@@ -25,11 +25,10 @@ Hovering over any capsule reveals a detailed floating preview card with origin p
 - Smooth shimmering loading skeletons during active stream resolution.
 - Real-time craft controls to adjust height, border radius, asset gap, and vertical offset.
 
-### 2. 🌐 Multi-Source Visual Intelligence (DuckDuckGo + Wikipedia)
-- **AI Vendor Selection**: Gemini dynamically decides the best image provider based on subject matter:
-  - 🔵 **DuckDuckGo (`|duckduckgo`)**: Candid real-world wildlife photography, celestial telescope captures, and dynamic natural landscapes.
-  - 🟡 **Wikipedia (`|wiki`)**: Anatomical cross-sections, cellular diagrams, molecular structures, and taxonomic specimens.
-- **Dynamic Visual Badging**: Interactive hover cards and lightboxes clearly indicate the content origin with direct source links.
+### 2. 🌐 Resolver-Independent Visual Intelligence
+- The Markdown asks for a visual without coupling the prose to a search provider.
+- The demo resolver currently searches Wikipedia, Wikimedia Commons, and a DuckDuckGo fallback.
+- Interactive hover cards and lightboxes indicate the selected source with a direct link.
 
 ### 3. 🛡️ Document-Wide Image Deduplication
 - **Root-Cause Prevention**: Prevents duplicate images when an answer mentions synonymous concepts (e.g. *Venus* and *Morning star*).
@@ -50,17 +49,15 @@ Hovering over any capsule reveals a detailed floating preview card with origin p
 
 ## 🏗️ Architecture & Token Syntax
 
-The engine uses custom Markdown tokens parsed in real time by [`tokenizer.ts`](src/core/tokenizer.ts):
+The public contract uses standard Markdown image structure. The image description is the search query, while the `neanderthal:image` destination tells an enabled renderer to resolve it dynamically:
 
 ```markdown
-![media:Query Title|vendor]
+An anglerfish ![Deep sea anglerfish](neanderthal:image) attracts prey with a glowing lure.
 ```
 
-| Token Syntax | Vendor Behavior | Typical Use Case |
-| :--- | :--- | :--- |
-| `![media:Anglerfish\|duckduckgo]` | Queries DuckDuckGo web search first | Real-world photography, candid wildlife |
-| `![media:Chloroplast\|wiki]` | Queries Wikipedia / Commons first | Scientific schematics, cellular anatomy |
-| `![media:Supernova]` | Smart auto-routing | General balance |
+Ordinary Markdown—including headings, lists, links, tables, code, and regular images—continues through the standard renderer unchanged. The earlier `![media:Query|vendor]` form remains supported temporarily for migration.
+
+During streaming, an unfinished image marker becomes a non-resolving placeholder. Once the complete marker arrives, the resolver fills the capsule while the rest of the answer continues.
 
 ---
 

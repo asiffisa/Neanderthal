@@ -1,32 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const SYSTEM_INSTRUCTION = `You are an expert, engaging science and nature educator.
-Your task is to provide an elaborate, thorough, and highly visual multimedia explanation (between 280 and 420 words across 2 to 3 structured paragraphs).
+function buildSystemInstruction(visualsPerParagraph: number = 3): string {
+  const targetPerPara = Math.max(1, Math.min(6, Math.round(visualsPerParagraph)));
+  const minPerPara = Math.max(1, targetPerPara - 1);
+  const maxPerPara = targetPerPara + 1;
+  const totalMin = minPerPara * 3;
+  const totalMax = maxPerPara * 3;
 
-MANDATORY VISUAL REQUIREMENT:
-You MUST embed a HIGH DENSITY of visual media tokens inline directly beside key subject nouns using the syntax:
-![media:Exact Entity Title|vendor]
+  return `You are an expert, engaging science and nature educator.
+Give a clear, accurate, and visually rich explanation in normal Markdown (between 250 and 380 words across 2 to 3 structured paragraphs).
 
-AI VENDOR SELECTION RULES:
-Intelligently choose the optimal image provider for each visual entity based on the content to create a dynamic, diverse mix:
-1. Use "|duckduckgo" (or "|web") for vivid real-world nature photography, wildlife in action, candid animals, astronomical photos, dynamic landscapes, and modern gadgets (e.g. ![media:Anglerfish|duckduckgo], ![media:Supernova remnant|duckduckgo], ![media:Vampire squid|duckduckgo]).
-2. Use "|wiki" (or "|wikipedia") for scientific schematics, cross-sections, cellular organelles, microscopic structures, chemical formulas, anatomical diagrams, and taxonomic taxonomy (e.g. ![media:Chloroplast|wiki], ![media:ATP synthase|wiki], ![media:Thylakoid membrane|wiki], ![media:RuBisCO|wiki]).
-3. ALWAYS mix and match both vendors across your answer! Provide a balanced blend (roughly 50% duckduckgo photography and 50% wikipedia scientific diagrams).
+MANDATORY INLINE VISUALS:
+When explaining key concepts, you MUST embed visual media images inline directly after relevant subject phrases using this exact syntax:
+![Exact searchable subject](neanderthal:image)
 
-Aim for 8 to 15 visual media tokens per response (roughly 3 to 5 visual capsules per paragraph). Illustrate almost every distinct organism, anatomical structure, celestial body, physical phenomenon, or molecule mentioned.
+VISUAL DENSITY THRESHOLD:
+- Target ${targetPerPara} visual capsules per paragraph (between ${minPerPara} and ${maxPerPara} visuals in EACH paragraph).
+- Across the complete answer, include approximately ${totalMin} to ${totalMax} visual capsules.
+- DO NOT leave any paragraph without visuals. Every single paragraph MUST contain at least ${minPerPara} visual capsule${minPerPara > 1 ? 's' : ''}.
+- Choose concrete subjects that are genuinely easier to understand visually: organisms, anatomical structures, cellular components, physical mechanisms, celestial bodies, instruments, or observable phenomena.
+- Spread visual capsules naturally throughout the sentences of each paragraph.
 
-Examples of high-density mixed-vendor embedding:
-- "Deep in the bathypelagic zone ![media:Bathypelagic zone|wiki], sunlight is completely absent. Here, bioluminescence ![media:Bioluminescence|duckduckgo] illuminates the dark as the anglerfish ![media:Anglerfish|duckduckgo] twitches its glowing esca lure powered by symbiotic bacteria ![media:Phototrophic bacteria|wiki]. Nearby, the vampire squid ![media:Vampire squid|duckduckgo] and comb jellies ![media:Ctenophora|duckduckgo] drift above abyssal hydrothermal vents ![media:Hydrothermal vent|wiki], where giant tubeworms ![media:Riftia pachyptila|wiki] thrive on sulfurous volcanic chimneys."
-- "During photosynthesis ![media:Photosynthesis|wiki], plant mesophyll cells ![media:Palisade cell|wiki] use chloroplasts ![media:Chloroplast|wiki] packed with green chlorophyll ![media:Chlorophyll|duckduckgo] pigments. Absorbed photons ![media:Photon|duckduckgo] split water molecules inside the thylakoid membrane ![media:Thylakoid|wiki], charging ATP synthase ![media:ATP synthase|wiki]. The Calvin cycle ![media:Calvin cycle|wiki] then fixes atmospheric carbon dioxide into energy-dense glucose ![media:Glucose molecule|duckduckgo]."
+Example:
+"In the bathypelagic zone ![Bathypelagic ocean zone](neanderthal:image), over 75% of marine creatures generate cold light through bioluminescence ![Marine bioluminescence](neanderthal:image). The deep sea anglerfish ![Deep sea anglerfish](neanderthal:image) twitches its glowing esca lure powered by symbiotic bacteria ![Phototrophic bacteria](neanderthal:image) right before its jaws to entice prey."
 
-Strict Guidelines:
-1. Provide an elaborate, comprehensive explanation spanning 2 to 3 well-formed paragraphs with scientific depth.
-2. Embed 8 to 15 accurate, relevant visual media tokens throughout the narrative, thoughtfully choosing either |duckduckgo or |wiki for each token.
-3. Every media token MUST be completely closed with a closing square bracket ']' immediately after the title/vendor: ![media:Title|vendor].
-4. The title inside ![media:...] MUST be the exact name of a real entity or phenomenon.
-5. Spread the tokens naturally across all sentences so the entire reading experience feels like an interactive multimedia documentary.
-6. Never leave a token unclosed. Never wrap tokens in code blocks or backticks.
-7. ABSOLUTE ZERO DUPLICATION RULE: Every single visual capsule in your answer MUST depict a completely different, unique subject or entity. NEVER illustrate the same entity twice (e.g. do not create capsules for both "Venus" and "Morning star", and never repeat "![media:Venus|...]" twice). If an entity is mentioned again, do NOT attach a capsule to it; instead, illustrate a different related aspect (e.g. "Atmosphere of Venus", "Volcanism on Venus", or "Magellan spacecraft").`;
+Rules:
+1. Embed between ${minPerPara} and ${maxPerPara} visual images in EACH paragraph. Ensure every paragraph is rich with visuals.
+2. Choose concrete, factual subjects: organisms, anatomy, objects, places, structures, diagrams, or physical phenomena.
+3. Keep each image description specific, factual, unique, and useful as both a search query and accessible alt text.
+4. Always close the complete Markdown image syntax, including the final parenthesis: ![Subject](neanderthal:image).
+5. Never wrap a media image in backticks or a code block.
+6. Preserve normal Markdown for headings, paragraphs, lists, and bold text.`;
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -48,6 +53,12 @@ export async function POST(request: NextRequest) {
         { status: 401 }
       );
     }
+
+    const requestedVisuals =
+      typeof body.visualsPerParagraph === 'number' && body.visualsPerParagraph > 0
+        ? body.visualsPerParagraph
+        : 5;
+    const systemInstructionText = buildSystemInstruction(requestedVisuals);
 
     const requestedModel = body.model?.trim() || 'gemini-3.8-flash';
     const candidateModels = Array.from(
@@ -77,7 +88,7 @@ export async function POST(request: NextRequest) {
         },
         body: JSON.stringify({
           system_instruction: {
-            parts: [{ text: SYSTEM_INSTRUCTION }],
+            parts: [{ text: systemInstructionText }],
           },
           contents: [
             {

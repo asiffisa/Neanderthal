@@ -41,6 +41,7 @@ export const InlineCapsule: React.FC<InlineCapsuleProps> = memo(({
   const [mounted, setMounted] = useState(false);
   const [popoverCoords, setPopoverCoords] = useState<{ top: number; left: number; placeBelow: boolean } | null>(null);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const closeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const capsuleRef = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
@@ -48,6 +49,9 @@ export const InlineCapsule: React.FC<InlineCapsuleProps> = memo(({
     return () => {
       if (hoverTimeoutRef.current) {
         clearTimeout(hoverTimeoutRef.current);
+      }
+      if (closeTimeoutRef.current) {
+        clearTimeout(closeTimeoutRef.current);
       }
     };
   }, []);
@@ -119,6 +123,10 @@ export const InlineCapsule: React.FC<InlineCapsuleProps> = memo(({
   }, [query, fallbackUrl, vendorPreference, isPartial, occurrenceIndex, id, claimedUrlsRef]);
 
   const handleMouseEnter = () => {
+    if (closeTimeoutRef.current) {
+      clearTimeout(closeTimeoutRef.current);
+      closeTimeoutRef.current = null;
+    }
     if (!settings.showHoverCard) return;
     if (capsuleRef.current) {
       const rect = capsuleRef.current.getBoundingClientRect();
@@ -130,14 +138,18 @@ export const InlineCapsule: React.FC<InlineCapsuleProps> = memo(({
     }
     hoverTimeoutRef.current = setTimeout(() => {
       setIsHovered(true);
-    }, 80);
+    }, 60);
   };
 
   const handleMouseLeave = () => {
     if (hoverTimeoutRef.current) {
       clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
     }
-    setIsHovered(false);
+    // 200ms debounce delay before closing so cursor can move between capsule and popover card
+    closeTimeoutRef.current = setTimeout(() => {
+      setIsHovered(false);
+    }, 200);
   };
 
   const hasImage = media.status === 'loaded' && Boolean(media.thumbnailUrl);
@@ -249,6 +261,10 @@ export const InlineCapsule: React.FC<InlineCapsuleProps> = memo(({
             className="w-72 p-3 rounded-xl bg-[#14161a] border border-white/20 shadow-2xl backdrop-blur-2xl pointer-events-auto text-left"
             onMouseEnter={() => {
               if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+              if (closeTimeoutRef.current) {
+                clearTimeout(closeTimeoutRef.current);
+                closeTimeoutRef.current = null;
+              }
               setIsHovered(true);
             }}
             onMouseLeave={handleMouseLeave}
@@ -295,7 +311,7 @@ export const InlineCapsule: React.FC<InlineCapsuleProps> = memo(({
             {/* Description */}
             {media.description && (
               <span className="block text-xs text-zinc-300 line-clamp-3 mb-2.5 leading-relaxed">
-                {media.description}
+                {media.description.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim()}
               </span>
             )}
 

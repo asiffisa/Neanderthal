@@ -53,6 +53,13 @@ export async function resolveMedia(
             status: 'loaded',
           };
           memoryCache.set(normalizedKey, resolved);
+
+          // Eagerly preload the image into the browser's cache so it renders instantly
+          if (typeof window !== 'undefined' && resolved.thumbnailUrl) {
+            const img = new Image();
+            img.src = resolved.thumbnailUrl;
+          }
+
           return resolved;
         }
       }

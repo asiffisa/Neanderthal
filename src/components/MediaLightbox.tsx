@@ -86,7 +86,7 @@ export const MediaLightbox: React.FC<MediaLightboxProps> = ({ media, onClose }) 
                   Query Token
                 </span>
                 <p className="font-mono text-xs text-zinc-300 bg-black/40 px-2.5 py-1.5 rounded-md border border-white/10 mt-1 inline-block">
-                  ![media:{media.query}]
+                  ![{media.query}](neanderthal:image)
                 </p>
               </div>
               <span
@@ -106,7 +106,7 @@ export const MediaLightbox: React.FC<MediaLightboxProps> = ({ media, onClose }) 
                   Summary / Context
                 </span>
                 <p className="text-sm text-zinc-200 mt-1 leading-relaxed">
-                  {media.description}
+                  {media.description.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim()}
                 </p>
               </div>
             )}
