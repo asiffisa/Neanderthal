@@ -4,15 +4,8 @@ import crypto from "node:crypto";
 export const dynamic = "force-dynamic";
 
 // Generates a cryptographically strong random alphanumeric string of requested length
-function generateAlphanumericSeed(length = 32): string {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  const bytes = crypto.randomBytes(length);
-  let result = "";
-  for (let i = 0; i < length; i++) {
-    result += chars[bytes[i] % chars.length];
-  }
-  return result;
-}
+const generateAlphanumericSeed = (length = 32): string =>
+  crypto.randomBytes(Math.ceil(length / 2)).toString("hex").slice(0, length);
 
 // 40+ specialized domain mechanisms used to force Gemini into non-repeating diverse exploration
 const DIVERSE_SCIENCE_DOMAINS = [

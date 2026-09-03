@@ -13,7 +13,6 @@ import {
   parseNeanderthalMediaSource,
   prepareNeanderthalMarkdown,
 } from '../core/media-markdown';
-import { remarkNeanderthalLegacy } from '../core/remark-neanderthal-legacy';
 import { InlineCapsule } from './InlineCapsule';
 
 interface StreamingMarkdownViewProps {
@@ -24,7 +23,7 @@ interface StreamingMarkdownViewProps {
   className?: string;
 }
 
-const remarkPlugins = [remarkGfm, remarkNeanderthalLegacy];
+const remarkPlugins = [remarkGfm];
 
 const safeMarkdownUrl: UrlTransform = (url, key) => {
   if (key === 'src' && url.startsWith(NEANDERTHAL_MEDIA_SCHEME)) {

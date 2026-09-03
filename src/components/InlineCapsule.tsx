@@ -43,6 +43,7 @@ export const InlineCapsule: React.FC<InlineCapsuleProps> = memo(({
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const closeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const capsuleRef = useRef<HTMLSpanElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -130,16 +131,45 @@ export const InlineCapsule: React.FC<InlineCapsuleProps> = memo(({
     if (!settings.showHoverCard) return;
     if (capsuleRef.current) {
       const rect = capsuleRef.current.getBoundingClientRect();
-      const placeBelow = rect.top < 360;
+      const viewportHeight = window.innerHeight;
+      const spaceBelow = viewportHeight - rect.bottom;
+      const spaceAbove = rect.top;
+
+      // Smart shift above:
+      // When hovering from bottom of view or when space below is tight (<420px),
+      // ALWAYS place above so the card never goes invisible below the viewport!
+      const placeBelow = spaceBelow >= 420 && spaceBelow >= spaceAbove;
+
       const centerX = rect.left + rect.width / 2;
       const left = Math.max(160, Math.min(window.innerWidth - 160, centerX));
       const top = placeBelow ? rect.bottom + 8 : rect.top - 8;
+
       setPopoverCoords({ top, left, placeBelow });
     }
     hoverTimeoutRef.current = setTimeout(() => {
       setIsHovered(true);
     }, 60);
   };
+
+  // Active viewport boundary guard:
+  // If popover card bottom ever touches or bleeds below the viewport, immediately shift above!
+  useEffect(() => {
+    if (!isHovered || !popoverRef.current || !capsuleRef.current) return;
+    const cardRect = popoverRef.current.getBoundingClientRect();
+    const viewportHeight = window.innerHeight;
+
+    if (cardRect.bottom > viewportHeight - 12) {
+      const capsuleRect = capsuleRef.current.getBoundingClientRect();
+      setPopoverCoords((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          placeBelow: false,
+          top: capsuleRect.top - 8,
+        };
+      });
+    }
+  }, [isHovered, media.thumbnailUrl, media.description]);
 
   const handleMouseLeave = () => {
     if (hoverTimeoutRef.current) {
@@ -169,8 +199,8 @@ export const InlineCapsule: React.FC<InlineCapsuleProps> = memo(({
     marginLeft: `${settings.gap / 2}px`,
     marginRight: `${settings.gap / 2}px`,
     height: `${capsuleHeight}px`,
-    minWidth: hasImage ? `${capsuleWidth}px` : 'auto',
-    width: hasImage ? `${capsuleWidth}px` : 'auto',
+    minWidth: `${capsuleWidth}px`,
+    width: `${capsuleWidth}px`,
     borderRadius: `${borderRadius}px`,
     lineHeight: 0,
     cursor: 'pointer',
@@ -192,6 +222,8 @@ export const InlineCapsule: React.FC<InlineCapsuleProps> = memo(({
           whileTap={{ scale: 0.96 }}
           transition={{ type: 'spring', stiffness: 450, damping: 28 }}
           onClick={() => onInspect?.(media)}
+          aria-label={media.title || query}
+          title={media.title || query}
           className={`group relative overflow-hidden transition-all duration-200 border ${
             isLoading
               ? 'border-white/10 bg-white/5'
@@ -200,11 +232,11 @@ export const InlineCapsule: React.FC<InlineCapsuleProps> = memo(({
               : 'border-white/10 bg-white/5 hover:border-white/20'
           }`}
         >
-          {/* Loading State: Shimmer Capsule */}
+          {/* Loading State: Compact Shimmer Capsule */}
           {isLoading && (
-            <span className="flex items-center gap-1.5 px-2 text-[10px] font-medium text-white/70 animate-shimmer whitespace-nowrap">
+            <span className="flex items-center justify-center w-full h-full text-white/70 animate-shimmer">
               <Sparkles className="w-2.5 h-2.5 text-amber-400 animate-pulse shrink-0" />
-              <span className="truncate max-w-[80px]">{query}</span>
+              <span className="sr-only">{query}</span>
             </span>
           )}
 
@@ -224,9 +256,9 @@ export const InlineCapsule: React.FC<InlineCapsuleProps> = memo(({
                 }`}
               />
               {!imageLoaded && (
-                <span className="absolute inset-0 flex items-center gap-1 px-2 text-[10px] text-white/50 animate-shimmer bg-white/5">
-                  <Sparkles className="w-2.5 h-2.5 text-amber-400/70 animate-pulse shrink-0" />
-                  <span className="truncate max-w-[70px]">{query}</span>
+                <span className="absolute inset-0 flex items-center justify-center bg-white/5 animate-shimmer">
+                  <Sparkles className="w-2.5 h-2.5 text-amber-400/80 animate-pulse shrink-0" />
+                  <span className="sr-only">{query}</span>
                 </span>
               )}
               <span className="absolute inset-0 bg-black/5 group-hover:bg-transparent transition-colors" />
@@ -235,9 +267,12 @@ export const InlineCapsule: React.FC<InlineCapsuleProps> = memo(({
 
           {/* Fallback Badge (when image 404s, errors out, or not found) */}
           {(media.status === 'not-found' || imageError) && (
-            <span className="flex items-center gap-1.5 px-2 text-[10px] font-medium text-amber-300/90 bg-amber-500/10 hover:bg-amber-500/20 transition-colors whitespace-nowrap">
+            <span
+              className="flex items-center justify-center w-full h-full text-amber-300/90 bg-amber-500/10 hover:bg-amber-500/20 transition-colors"
+              title={media.title || query}
+            >
               <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
-              <span className="truncate max-w-[120px]">{media.title || query}</span>
+              <span className="sr-only">{media.title || query}</span>
             </span>
           )}
         </motion.button>
@@ -247,6 +282,7 @@ export const InlineCapsule: React.FC<InlineCapsuleProps> = memo(({
       {mounted && isHovered && popoverCoords && (media.status === 'loaded' || imageError) && typeof document !== 'undefined' &&
         createPortal(
           <motion.div
+            ref={popoverRef}
             initial={{ opacity: 0, y: popoverCoords.placeBelow ? -8 : 8, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: popoverCoords.placeBelow ? -6 : 6, scale: 0.96 }}
@@ -258,7 +294,7 @@ export const InlineCapsule: React.FC<InlineCapsuleProps> = memo(({
               transform: `translate(-50%, ${popoverCoords.placeBelow ? '0' : '-100%'})`,
               zIndex: 99999,
             }}
-            className="w-72 p-3 rounded-xl bg-[#14161a] border border-white/20 shadow-2xl backdrop-blur-2xl pointer-events-auto text-left"
+            className="w-72 p-3 rounded-xl bg-[#14161a] border border-white/20 shadow-2xl backdrop-blur-2xl pointer-events-auto text-left max-h-[calc(100vh-32px)] overflow-y-auto"
             onMouseEnter={() => {
               if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
               if (closeTimeoutRef.current) {
@@ -310,7 +346,14 @@ export const InlineCapsule: React.FC<InlineCapsuleProps> = memo(({
 
             {/* Description */}
             {media.description && (
-              <span className="block text-xs text-zinc-300 line-clamp-3 mb-2.5 leading-relaxed">
+              <span
+                className="block text-xs text-zinc-300 mb-2.5 leading-relaxed overflow-hidden"
+                style={{
+                  display: '-webkit-box',
+                  WebkitLineClamp: 3,
+                  WebkitBoxOrient: 'vertical',
+                }}
+              >
                 {media.description.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim()}
               </span>
             )}

@@ -133,17 +133,25 @@ export function createNeanderthalMediaMarkdown(
   return `![${escapedQuery}](${createNeanderthalMediaSource(options)})`;
 }
 
+const CODE_OR_LEGACY_MEDIA_REGEX =
+  /(```[\s\S]*?```|~~~[\s\S]*?~~~|`[^`\n]+`)|(!\[media:([^\]]+)\](?:\(([^)]+)\))?)/g;
+
 /** Keep old demo content working while the public syntax moves to CommonMark images. */
 export function normalizeLegacyMediaMarkdown(markdown: string): string {
-  return markdown.replace(LEGACY_MEDIA_REGEX, (match, rawDescriptor, fallbackUrl) => {
-    const descriptor = parseLegacyMediaAlt(`media:${String(rawDescriptor)}`);
-    if (!descriptor) return match;
+  return markdown.replace(
+    CODE_OR_LEGACY_MEDIA_REGEX,
+    (match, codeBlock, _mediaMatch, rawDescriptor, fallbackUrl) => {
+      if (codeBlock) return codeBlock;
 
-    return createNeanderthalMediaMarkdown(descriptor.query, {
-      vendorPreference: descriptor.vendorPreference,
-      fallbackUrl: typeof fallbackUrl === 'string' ? fallbackUrl.trim() : undefined,
-    });
-  });
+      const descriptor = parseLegacyMediaAlt(`media:${String(rawDescriptor)}`);
+      if (!descriptor) return match;
+
+      return createNeanderthalMediaMarkdown(descriptor.query, {
+        vendorPreference: descriptor.vendorPreference,
+        fallbackUrl: typeof fallbackUrl === 'string' ? fallbackUrl.trim() : undefined,
+      });
+    }
+  );
 }
 
 function findTrailingIncompleteImage(markdown: string): number {
@@ -178,12 +186,13 @@ export function prepareNeanderthalMarkdown(
   markdown: string,
   isStreaming: boolean = false
 ): string {
-  if (!isStreaming) return markdown;
+  const normalized = normalizeLegacyMediaMarkdown(markdown);
+  if (!isStreaming) return normalized;
 
-  const partialStart = findTrailingIncompleteImage(markdown);
-  if (partialStart < 0) return markdown;
+  const partialStart = findTrailingIncompleteImage(normalized);
+  if (partialStart < 0) return normalized;
 
-  return `${markdown.slice(0, partialStart)}${createNeanderthalMediaMarkdown('Visualizing…', {
+  return `${normalized.slice(0, partialStart)}${createNeanderthalMediaMarkdown('Visualizing…', {
     partial: true,
   })}`;
 }
