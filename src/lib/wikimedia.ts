@@ -14,9 +14,10 @@ export async function resolveMedia(
   fallbackUrl?: string,
   vendorPreference: 'wikipedia' | 'duckduckgo' | 'auto' = 'auto',
   excludeUrl?: string,
-  occurrence: number = 0
+  occurrence: number = 0,
+  context?: string
 ): Promise<ResolvedMedia> {
-  const normalizedKey = `${query.trim().toLowerCase()}:${vendorPreference}:${excludeUrl || ''}:${occurrence}`;
+  const normalizedKey = `${query.trim().toLowerCase()}:${vendorPreference}:${excludeUrl || ''}:${occurrence}:${(context || '').trim().toLowerCase()}`;
 
   // 1. Check in-memory session cache
   if (memoryCache.has(normalizedKey)) {
@@ -32,6 +33,8 @@ export async function resolveMedia(
   const fetchPromise = (async (): Promise<ResolvedMedia> => {
     try {
       const url = `/api/resolve?q=${encodeURIComponent(query)}${
+        context ? `&context=${encodeURIComponent(context)}` : ''
+      }${
         vendorPreference !== 'auto' ? `&source=${vendorPreference}` : ''
       }${excludeUrl ? `&exclude=${encodeURIComponent(excludeUrl)}` : ''}${
         occurrence > 0 ? `&occurrence=${occurrence}` : ''

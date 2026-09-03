@@ -17,6 +17,7 @@ interface InlineCapsuleProps {
   id?: string;
   occurrenceIndex?: number;
   claimedUrlsRef?: React.MutableRefObject<Map<string, string>>;
+  context?: string;
 }
 
 export const InlineCapsule: React.FC<InlineCapsuleProps> = memo(({
@@ -29,6 +30,7 @@ export const InlineCapsule: React.FC<InlineCapsuleProps> = memo(({
   id,
   occurrenceIndex = 0,
   claimedUrlsRef,
+  context,
 }) => {
   const [media, setMedia] = useState<ResolvedMedia>({
     query,
@@ -76,7 +78,8 @@ export const InlineCapsule: React.FC<InlineCapsuleProps> = memo(({
         fallbackUrl,
         vendorPreference,
         undefined,
-        occurrenceIndex
+        occurrenceIndex,
+        context
       );
 
       if (!isCurrent) return;
@@ -95,7 +98,8 @@ export const InlineCapsule: React.FC<InlineCapsuleProps> = memo(({
             fallbackUrl,
             vendorPreference,
             res.thumbnailUrl,
-            occurrenceIndex + 1
+            occurrenceIndex + 1,
+            context
           );
 
           if (isCurrent && altRes.thumbnailUrl) {
@@ -121,7 +125,7 @@ export const InlineCapsule: React.FC<InlineCapsuleProps> = memo(({
         claimedUrlsRef.current.delete(id || query);
       }
     };
-  }, [query, fallbackUrl, vendorPreference, isPartial, occurrenceIndex, id, claimedUrlsRef]);
+  }, [query, fallbackUrl, vendorPreference, isPartial, occurrenceIndex, id, claimedUrlsRef, context]);
 
   const handleMouseEnter = () => {
     if (closeTimeoutRef.current) {

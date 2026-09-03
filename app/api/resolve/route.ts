@@ -26,6 +26,13 @@ function cleanExtractText(raw: string): string {
     .trim();
 }
 
+function cleanSearchQuery(query: string): string {
+  return query
+    .replace(/\b(portrait|photograph|photo|picture|image|illustration|diagram|stills|wallpaper)\b/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function simplifyQuery(query: string): string {
   const words = query
     .toLowerCase()
@@ -35,13 +42,41 @@ function simplifyQuery(query: string): string {
   return words.slice(0, 3).join(' ');
 }
 
+function isRelevantWikipediaPage(pageTitle: string, query: string, context?: string): boolean {
+  const normalize = (s: string) =>
+    s.toLowerCase().replace(/[^\w\s]/g, '').split(/\s+/).filter(w => !STOP_WORDS.has(w) && w.length > 2);
+
+  const titleTokens = normalize(pageTitle);
+  const queryTokens = normalize(query);
+  const contextTokens = context ? normalize(context) : [];
+
+  // Direct containment: if title contains query or query contains title
+  const lowerTitle = pageTitle.toLowerCase();
+  const lowerQuery = query.toLowerCase();
+  if (lowerTitle.includes(lowerQuery) || lowerQuery.includes(lowerTitle)) {
+    return true;
+  }
+
+  // Token overlap check with query
+  const hasQueryTokenMatch = queryTokens.some(q => titleTokens.includes(q) || lowerTitle.includes(q));
+  if (hasQueryTokenMatch) return true;
+
+  // Token overlap check with context (if context is a concise entity)
+  if (contextTokens.length > 0 && contextTokens.length <= 3) {
+    const hasContextMatch = contextTokens.some(c => titleTokens.includes(c) || lowerTitle.includes(c));
+    if (hasContextMatch) return true;
+  }
+
+  return false;
+}
+
 async function searchDuckDuckGoFast(
   query: string,
   excludeUrl?: string,
   occurrence = 0
 ): Promise<{ title: string; imageUrl: string; sourceUrl: string } | null> {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 1800); // 1.8s timeout cap
+  const timeoutId = setTimeout(() => controller.abort(), 2500); // 2.5s timeout cap
 
   try {
     const tokenUrl = `https://duckduckgo.com/?q=${encodeURIComponent(query)}&iax=images&ia=images`;
@@ -99,6 +134,100 @@ async function searchDuckDuckGoFast(
   return null;
 }
 
+async function searchWikipedia(
+  searchTerm: string,
+  occurrence: number,
+  isExcluded: (url: string | null | undefined) => boolean,
+  context?: string
+): Promise<{ title: string; imageUrl: string; sourceUrl: string; extract?: string } | null> {
+  const searchUrl = `https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(
+    searchTerm
+  )}&gsrlimit=6&prop=pageimages|extracts&pithumbsize=600&pilimit=6&exintro=1&explaintext=1&redirects=1&format=json&origin=*`;
+
+  try {
+    const res = await fetch(searchUrl, {
+      headers: { 'User-Agent': USER_AGENT },
+    });
+
+    if (!res.ok) return null;
+    const data = await res.json();
+    const pages = Object.values(data.query?.pages || {}) as any[];
+
+    // 1. Filter out pages without thumbnails or matching excludeUrl
+    const validPages = pages.filter((p) => {
+      const thumb = p.thumbnail?.source;
+      return thumb && !isExcluded(thumb);
+    });
+
+    if (validPages.length === 0) return null;
+
+    // 2. Filter strictly for relevant pages that actually match the query or context
+    const relevantPages = validPages.filter((p) =>
+      isRelevantWikipediaPage(p.title || '', searchTerm, context)
+    );
+
+    // If none of the returned pages match the query (e.g. Wikipedia returned Ben Kingsley for Mohanlal), reject!
+    if (relevantPages.length === 0) {
+      return null;
+    }
+
+    const targetPage = relevantPages[occurrence] || relevantPages[0];
+    if (targetPage && targetPage.thumbnail?.source) {
+      const title = targetPage.title || searchTerm;
+      return {
+        title,
+        imageUrl: targetPage.thumbnail.source,
+        sourceUrl: `https://en.wikipedia.org/wiki/${encodeURIComponent(title.replace(/\s+/g, '_'))}`,
+        extract: targetPage.extract,
+      };
+    }
+  } catch {
+    // Network error
+  }
+  return null;
+}
+
+async function searchCommons(
+  searchTerm: string,
+  isExcluded: (url: string | null | undefined) => boolean
+): Promise<{ title: string; imageUrl: string; sourceUrl: string } | null> {
+  const commonsUrl = `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(
+    searchTerm + ' -filetype:pdf -icon'
+  )}&gsrnamespace=6&gsrlimit=4&prop=imageinfo&iiprop=url&iiurlwidth=600&format=json&origin=*`;
+
+  try {
+    const res = await fetch(commonsUrl, {
+      headers: { 'User-Agent': USER_AGENT },
+    });
+
+    if (!res.ok) return null;
+    const commonsData = await res.json();
+    const cPages = Object.values(commonsData.query?.pages || {}) as any[];
+    for (const cp of cPages) {
+      const info = cp.imageinfo?.[0];
+      const url = info?.thumburl || info?.url;
+      const lower = (cp.title || '').toLowerCase();
+      if (
+        url &&
+        !lower.includes('.pdf') &&
+        !lower.includes('.svg') &&
+        !lower.includes('logo') &&
+        !isExcluded(url)
+      ) {
+        const title = (cp.title || searchTerm).replace(/^File:/i, '');
+        return {
+          title,
+          imageUrl: url,
+          sourceUrl: `https://commons.wikimedia.org/wiki/${encodeURIComponent((cp.title || searchTerm).replace(/\s+/g, '_'))}`,
+        };
+      }
+    }
+  } catch {
+    // Network error
+  }
+  return null;
+}
+
 interface ServerCacheEntry {
   data: {
     query: string;
@@ -120,19 +249,20 @@ const MAX_CACHE_SIZE = 1000;
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const query = searchParams.get('q');
+  const context = searchParams.get('context')?.trim() || '';
   const requestedVendor =
     searchParams.get('source')?.toLowerCase() ||
     searchParams.get('vendor')?.toLowerCase() ||
     'auto';
   const excludeUrl = searchParams.get('exclude')?.trim() || '';
-  const occurrence = parseInt(searchParams.get('occurrence') || '0', 10);
+  const occurrence = Math.max(0, parseInt(searchParams.get('occurrence') || '0', 10) || 0);
 
   if (!query || !query.trim()) {
     return NextResponse.json({ error: 'Missing query parameter q' }, { status: 400 });
   }
 
   const cleanQuery = query.trim();
-  const cacheKey = `${cleanQuery.toLowerCase()}:${requestedVendor}:${excludeUrl}:${occurrence}`;
+  const cacheKey = `${cleanQuery.toLowerCase()}:${context.toLowerCase()}:${requestedVendor}:${excludeUrl}:${occurrence}`;
 
   // 1. Instant Cache Hit
   const cached = serverResolveCache.get(cacheKey);
@@ -146,9 +276,8 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    let description = 'Public domain scientific knowledge reference.';
+    let description = 'Public domain knowledge reference.';
     let resolvedTitle = cleanQuery;
-    // Default to Wikipedia search so users never hit an empty "article does not exist" page
     let resolvedSourceUrl = `https://en.wikipedia.org/w/index.php?search=${encodeURIComponent(
       cleanQuery
     )}&title=Special%3ASearch&fulltext=1`;
@@ -161,129 +290,134 @@ export async function GET(request: NextRequest) {
       return false;
     };
 
-    // If DuckDuckGo was explicitly requested, do DDG first
+    // Clean filler words like "portrait photograph", "photo of", etc.
+    const sanitizedQuery = cleanSearchQuery(cleanQuery) || cleanQuery;
+
+    // Detect if this subject or overall topic is related to cinema, people, entertainment, or pop culture
+    const combinedContext = `${sanitizedQuery} ${context}`.toLowerCase();
+    const isCultureOrEntertainment =
+      /\b(actor|actress|film|movie|cinema|director|singer|album|song|celebrity|wedding|stills|starring|tamil|telugu|malayalam|bollywood|hollywood|series|tv|show|character|husband|wife|marriage|sons|daughter|family)\b/i.test(
+        combinedContext
+      );
+
+    // Context is ONLY valid if it is a concise entity (<= 3 words, no questions, not a paragraph)
+    const isContextValid =
+      context && !context.includes('?') && context.split(/\s+/).length <= 3;
+    const hasContextInQuery =
+      isContextValid && sanitizedQuery.toLowerCase().includes(context.toLowerCase());
+    const wordsInQuery = sanitizedQuery.split(/\s+/).length;
+
+    // Only enrich if context is a concise entity AND query is short (e.g. Maya -> Maya Nayanthara)
+    const enrichedQuery =
+      isContextValid && !hasContextInQuery && (wordsInQuery <= 2 || isCultureOrEntertainment)
+        ? `${sanitizedQuery} ${context}`.trim()
+        : sanitizedQuery;
+
+    // Determine vendor priority:
+    // 1. If explicitly requested as DuckDuckGo -> DDG first
+    // 2. If explicitly requested as Wikipedia -> Wikipedia first
+    // 3. If 'auto':
+    //    - If cinema/entertainment/people -> DuckDuckGo first! (Wikipedia excludes copyrighted stills/press photos)
+    //    - Else -> Balanced spread: alternate 50/50 (odd occurrence -> DDG, even occurrence -> Wikipedia)
     const wantsDuckDuckGo =
       requestedVendor === 'duckduckgo' ||
       requestedVendor === 'ddg' ||
       requestedVendor === 'web';
+    const wantsWikipedia =
+      requestedVendor === 'wikipedia' ||
+      requestedVendor === 'wiki';
 
-    if (wantsDuckDuckGo) {
-      const ddgResult = await searchDuckDuckGoFast(cleanQuery, excludeUrl, occurrence);
+    const preferDDGFirst =
+      wantsDuckDuckGo ||
+      (!wantsWikipedia && (isCultureOrEntertainment || occurrence % 2 === 1));
+
+    // ROUTE A: Try DuckDuckGo First
+    if (preferDDGFirst) {
+      // Try with context-enriched query first, then base query
+      let ddgResult = await searchDuckDuckGoFast(enrichedQuery, excludeUrl, occurrence);
+      if (!ddgResult && enrichedQuery !== sanitizedQuery) {
+        ddgResult = await searchDuckDuckGoFast(sanitizedQuery, excludeUrl, occurrence);
+      }
+
       if (ddgResult) {
         rawImageUrl = ddgResult.imageUrl;
         resolvedTitle = ddgResult.title || cleanQuery;
         resolvedSourceUrl = ddgResult.sourceUrl;
-        description = `Live photography for "${cleanQuery}" via DuckDuckGo.`;
         resolvedVendor = 'duckduckgo';
+        description = `Live photography for "${cleanQuery}" via DuckDuckGo.`;
       }
     }
 
-    // LAYER 1 (FAST): Wikipedia Generator Search
-    // Combines full-text semantic search, redirect resolution, extracts, and 600px thumbnail in 1 single HTTP request (~250ms)
+    // ROUTE B: Try Wikipedia First (or Fallback if DDG was empty)
     if (!rawImageUrl) {
-      const searchUrl = `https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(
-        cleanQuery
-      )}&gsrlimit=4&prop=pageimages|extracts&pithumbsize=600&pilimit=4&exintro=1&explaintext=1&redirects=1&format=json&origin=*`;
+      // 1. Try context-enriched Wikipedia search first
+      let wikiResult = await searchWikipedia(
+        enrichedQuery,
+        occurrence,
+        isExcluded,
+        isContextValid ? context : undefined
+      );
+      // 2. If enriched search had no relevant thumbnail, try sanitized query
+      if (!wikiResult && enrichedQuery !== sanitizedQuery) {
+        wikiResult = await searchWikipedia(
+          sanitizedQuery,
+          occurrence,
+          isExcluded,
+          isContextValid ? context : undefined
+        );
+      }
 
-      const res = await fetch(searchUrl, {
-        headers: { 'User-Agent': USER_AGENT },
-      });
+      if (wikiResult) {
+        rawImageUrl = wikiResult.imageUrl;
+        resolvedTitle = wikiResult.title;
+        resolvedSourceUrl = wikiResult.sourceUrl;
+        resolvedVendor = 'wikipedia';
+        if (wikiResult.extract) {
+          description = cleanExtractText(wikiResult.extract).slice(0, 240) + '...';
+        }
+      }
+    }
 
-      if (res.ok) {
-        const data = await res.json();
-        const pages = Object.values(data.query?.pages || {}) as any[];
+    // ROUTE C: Wikimedia Commons (For scientific/diagrammatic subjects)
+    if (!rawImageUrl) {
+      let commonsResult = await searchCommons(enrichedQuery, isExcluded);
+      if (!commonsResult && enrichedQuery !== sanitizedQuery) {
+        commonsResult = await searchCommons(sanitizedQuery, isExcluded);
+      }
 
-        // Filter valid pages with thumbnails that are not excluded
-        const validPages = pages.filter((p) => {
-          const thumb = p.thumbnail?.source;
-          return thumb && !isExcluded(thumb);
-        });
+      if (commonsResult) {
+        rawImageUrl = commonsResult.imageUrl;
+        resolvedTitle = commonsResult.title;
+        resolvedSourceUrl = commonsResult.sourceUrl;
+        resolvedVendor = 'wikipedia';
+        description = `Scientific media archive illustration for "${cleanQuery}".`;
+      }
+    }
 
-        const targetPage = validPages[occurrence] || validPages[0];
-        if (targetPage && targetPage.thumbnail?.source) {
-          rawImageUrl = targetPage.thumbnail.source;
-          resolvedTitle = targetPage.title || cleanQuery;
-          resolvedSourceUrl = `https://en.wikipedia.org/wiki/${encodeURIComponent(
-            resolvedTitle.replace(/\s+/g, '_')
-          )}`;
-          if (targetPage.extract) {
-            description = cleanExtractText(targetPage.extract).slice(0, 240) + '...';
+    // ROUTE D: Simplified Query (for long descriptive phrases)
+    if (!rawImageUrl) {
+      const simplified = simplifyQuery(sanitizedQuery);
+      if (simplified && simplified.toLowerCase() !== sanitizedQuery.toLowerCase()) {
+        const simpResult = await searchWikipedia(simplified, 0, isExcluded);
+        if (simpResult) {
+          rawImageUrl = simpResult.imageUrl;
+          resolvedTitle = simpResult.title;
+          resolvedSourceUrl = simpResult.sourceUrl;
+          resolvedVendor = 'wikipedia';
+          if (simpResult.extract) {
+            description = cleanExtractText(simpResult.extract).slice(0, 240) + '...';
           }
         }
       }
     }
 
-    // LAYER 2 (FAST): Wikimedia Commons Direct Media Generator Search
-    // If Wikipedia didn't have an article thumbnail, Commons has millions of scientific photos/diagrams
-    if (!rawImageUrl) {
-      const commonsUrl = `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(
-        cleanQuery + ' -filetype:pdf -icon'
-      )}&gsrnamespace=6&gsrlimit=4&prop=imageinfo&iiprop=url&iiurlwidth=600&format=json&origin=*`;
-
-      const resCommons = await fetch(commonsUrl, {
-        headers: { 'User-Agent': USER_AGENT },
-      });
-
-      if (resCommons.ok) {
-        const commonsData = await resCommons.json();
-        const cPages = Object.values(commonsData.query?.pages || {}) as any[];
-        for (const cp of cPages) {
-          const info = cp.imageinfo?.[0];
-          const url = info?.thumburl || info?.url;
-          const lower = (cp.title || '').toLowerCase();
-          if (
-            url &&
-            !lower.includes('.pdf') &&
-            !lower.includes('.svg') &&
-            !lower.includes('logo') &&
-            !isExcluded(url)
-          ) {
-            rawImageUrl = url;
-            resolvedTitle = (cp.title || cleanQuery).replace(/^File:/i, '');
-            resolvedSourceUrl = `https://commons.wikimedia.org/wiki/${encodeURIComponent(
-              (cp.title || cleanQuery).replace(/\s+/g, '_')
-            )}`;
-            description = `Scientific media archive illustration for "${cleanQuery}".`;
-            break;
-          }
-        }
+    // ROUTE E: DuckDuckGo Final Fallback (if Wikipedia route was attempted first and found nothing)
+    if (!rawImageUrl && !preferDDGFirst) {
+      let ddgResult = await searchDuckDuckGoFast(enrichedQuery, excludeUrl, occurrence);
+      if (!ddgResult && enrichedQuery !== sanitizedQuery) {
+        ddgResult = await searchDuckDuckGoFast(sanitizedQuery, excludeUrl, occurrence);
       }
-    }
 
-    // LAYER 3 (FAST KEYWORD SIMPLIFICATION):
-    // For long complex phrases ("specialized upper layer of the dermis" -> "dermis")
-    if (!rawImageUrl) {
-      const simplified = simplifyQuery(cleanQuery);
-      if (simplified && simplified.toLowerCase() !== cleanQuery.toLowerCase()) {
-        const simpUrl = `https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(
-          simplified
-        )}&gsrlimit=3&prop=pageimages|extracts&pithumbsize=600&pilimit=3&exintro=1&explaintext=1&redirects=1&format=json&origin=*`;
-
-        const resSimp = await fetch(simpUrl, {
-          headers: { 'User-Agent': USER_AGENT },
-        });
-
-        if (resSimp.ok) {
-          const simpData = await resSimp.json();
-          const pages = Object.values(simpData.query?.pages || {}) as any[];
-          const targetPage = pages.find((p) => p.thumbnail?.source && !isExcluded(p.thumbnail.source));
-          if (targetPage && targetPage.thumbnail?.source) {
-            rawImageUrl = targetPage.thumbnail.source;
-            resolvedTitle = targetPage.title || cleanQuery;
-            resolvedSourceUrl = `https://en.wikipedia.org/wiki/${encodeURIComponent(
-              resolvedTitle.replace(/\s+/g, '_')
-            )}`;
-            if (targetPage.extract) {
-              description = cleanExtractText(targetPage.extract).slice(0, 240) + '...';
-            }
-          }
-        }
-      }
-    }
-
-    // LAYER 4 (FALLBACK WITH FAST 1.8S TIMEOUT): DuckDuckGo live search
-    if (!rawImageUrl && !wantsDuckDuckGo) {
-      const ddgResult = await searchDuckDuckGoFast(cleanQuery, excludeUrl, occurrence);
       if (ddgResult) {
         rawImageUrl = ddgResult.imageUrl;
         resolvedTitle = ddgResult.title || cleanQuery;

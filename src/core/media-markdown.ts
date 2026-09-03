@@ -178,7 +178,42 @@ function findTrailingIncompleteImage(markdown: string): number {
 }
 
 /**
- * Hide an unfinished image marker during streaming.
+ * Ensures that if an image pill was placed without the noun in text
+ * (e.g. "The ![Electric eel](neanderthal:image) achieves..." or "modified ![muscle](neanderthal:image) tissue"),
+ * the noun is restored directly in the text so the prose remains 100% complete, readable, and grammatical.
+ * The pill acts as a supportive layer, never replacing the words.
+ */
+export function ensureTextAccompaniesPills(markdown: string): string {
+  // 1. Pill at beginning of sentence/line without preceding noun
+  let res = markdown.replace(
+    /(^|[.!?]\s+)(!\[([^\]]+)\]\((neanderthal:image[^\)]*)\))/g,
+    (match, boundary, fullPill, query) => {
+      const q = query.trim();
+      if (!q || q.toLowerCase() === 'visualizing…') return match;
+      return `${boundary}${q} ${fullPill}`;
+    }
+  );
+
+  // 2. Pill immediately following an article, pronoun, or adjective where the noun was omitted
+  res = res.replace(
+    /(\b(?:the|a|an|this|that|these|those|each|every|all|its|their|his|her|individual|modified|specialized|serial|single|disc-like)\s+)(!\[([^\]]+)\]\((neanderthal:image[^\)]*)\))/gi,
+    (match, prefix, fullPill, query) => {
+      const cleanQ = query.trim().toLowerCase();
+      if (!cleanQ || cleanQ === 'visualizing…') return match;
+      const prefixLower = prefix.toLowerCase();
+
+      // If the text before the pill already ends with or includes the noun, don't duplicate
+      if (prefixLower.includes(cleanQ)) return match;
+
+      return `${prefix}${query.trim()} ${fullPill}`;
+    }
+  );
+
+  return res;
+}
+
+/**
+ * Hide an unfinished image marker during streaming and ensure nouns accompany pills.
  * Legacy tokens are upgraded later in the Markdown tree so code remains literal.
  * The temporary capsule never starts a network request.
  */
@@ -187,12 +222,13 @@ export function prepareNeanderthalMarkdown(
   isStreaming: boolean = false
 ): string {
   const normalized = normalizeLegacyMediaMarkdown(markdown);
-  if (!isStreaming) return normalized;
+  const enhanced = ensureTextAccompaniesPills(normalized);
+  if (!isStreaming) return enhanced;
 
-  const partialStart = findTrailingIncompleteImage(normalized);
-  if (partialStart < 0) return normalized;
+  const partialStart = findTrailingIncompleteImage(enhanced);
+  if (partialStart < 0) return enhanced;
 
-  return `${normalized.slice(0, partialStart)}${createNeanderthalMediaMarkdown('Visualizing…', {
+  return `${enhanced.slice(0, partialStart)}${createNeanderthalMediaMarkdown('Visualizing…', {
     partial: true,
   })}`;
 }

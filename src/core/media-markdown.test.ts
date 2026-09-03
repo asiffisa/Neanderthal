@@ -59,4 +59,18 @@ describe('Neanderthal Markdown contract', () => {
       'A **complete** image ![Mantis shrimp](neanderthal:image) and [source](https://example.com).';
     expect(prepareNeanderthalMarkdown(markdown, true)).toBe(markdown);
   });
+
+  it('restores omitted nouns so text is readable without hovering', () => {
+    const omitted =
+      'The ![Electric eel](neanderthal:image) generates charge using modified ![muscle](neanderthal:image) tissue.';
+    expect(prepareNeanderthalMarkdown(omitted, false)).toBe(
+      'The Electric eel ![Electric eel](neanderthal:image) generates charge using modified muscle ![muscle](neanderthal:image) tissue.'
+    );
+  });
+
+  it('does not duplicate nouns when already present in prose', () => {
+    const alreadyPresent =
+      'The electric eel ![Electric eel](neanderthal:image) generates charge.';
+    expect(prepareNeanderthalMarkdown(alreadyPresent, false)).toBe(alreadyPresent);
+  });
 });

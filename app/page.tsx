@@ -324,14 +324,30 @@ export default function PlaygroundPage() {
     return activeTokens.filter((t) => t.type === 'media');
   }, [activeTokens]);
 
+  const activeEntityContext = useMemo(() => {
+    // Only pass context if it is a concise entity name (<= 3 words, no question marks, not a full sentence)
+    const candidate = (selectedPreset.title || selectedPreset.prompt || '').trim();
+    if (!candidate || candidate.includes('?') || candidate.split(/\s+/).length > 3) {
+      return '';
+    }
+    return candidate;
+  }, [selectedPreset.title, selectedPreset.prompt]);
+
   // Proactively pre-resolve media tokens in parallel as they stream in
   useEffect(() => {
     for (const token of mediaTokens) {
       if (token.query && !token.isPartial) {
-        resolveMedia(token.query, token.fallbackUrl, token.vendorPreference);
+        resolveMedia(
+          token.query,
+          token.fallbackUrl,
+          token.vendorPreference,
+          undefined,
+          0,
+          activeEntityContext
+        );
       }
     }
-  }, [mediaTokens]);
+  }, [mediaTokens, activeEntityContext]);
 
   const handleSidebarMediaClick = async (
     query: string,
@@ -339,7 +355,14 @@ export default function PlaygroundPage() {
     vendorPreference?: 'wikipedia' | 'duckduckgo' | 'auto'
   ) => {
     setInspectMedia({ query, title: query, status: 'loading' });
-    const resolved = await resolveMedia(query, fallbackUrl, vendorPreference);
+    const resolved = await resolveMedia(
+      query,
+      fallbackUrl,
+      vendorPreference,
+      undefined,
+      0,
+      activeEntityContext
+    );
     setInspectMedia(resolved);
   };
 
@@ -474,6 +497,7 @@ export default function PlaygroundPage() {
 
               <StreamingMarkdownView
                 content={streamedText}
+                context={activeEntityContext}
                 isStreaming={isStreaming}
                 settings={capsuleSettings}
                 onInspect={(m) => setInspectMedia(m)}

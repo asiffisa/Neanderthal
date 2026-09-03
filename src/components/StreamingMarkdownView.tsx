@@ -17,6 +17,7 @@ import { InlineCapsule } from './InlineCapsule';
 
 interface StreamingMarkdownViewProps {
   content: string;
+  context?: string;
   isStreaming?: boolean;
   settings: CapsuleSettings;
   onInspect?: (media: ResolvedMedia) => void;
@@ -35,6 +36,7 @@ const safeMarkdownUrl: UrlTransform = (url, key) => {
 
 interface MarkdownRenderContextValue {
   settings: CapsuleSettings;
+  context?: string;
   onInspect?: (media: ResolvedMedia) => void;
   claimedUrlsRef: React.MutableRefObject<Map<string, string>>;
 }
@@ -81,6 +83,7 @@ const MarkdownImage: NonNullable<Components['img']> = ({
       settings={renderContext.settings}
       onInspect={renderContext.onInspect}
       claimedUrlsRef={renderContext.claimedUrlsRef}
+      context={renderContext.context}
     />
   );
 };
@@ -154,6 +157,7 @@ const markdownComponents: Components = {
 
 export const StreamingMarkdownView: React.FC<StreamingMarkdownViewProps> = memo(({
   content,
+  context,
   isStreaming = false,
   settings,
   onInspect,
@@ -174,9 +178,10 @@ export const StreamingMarkdownView: React.FC<StreamingMarkdownViewProps> = memo(
 
   const renderContext = useMemo<MarkdownRenderContextValue>(() => ({
     settings,
+    context,
     onInspect,
     claimedUrlsRef,
-  }), [onInspect, settings]);
+  }), [onInspect, settings, context]);
 
   if (!content) {
     return null;
