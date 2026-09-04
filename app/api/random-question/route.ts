@@ -1,3 +1,4 @@
+import { fetchWithLimits, readJsonObject, RequestError } from '../../../src/lib/request-limits';
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "node:crypto";
 
@@ -349,9 +350,15 @@ const CURATED_FALLBACK_POOL = [
 ];
 
 export async function POST(request: NextRequest) {
+  const signal = AbortSignal.any([request.signal, AbortSignal.timeout(15000)]);
   try {
-    const body = await request.json().catch(() => ({}));
+    const body = await readJsonObject(request, signal);
     const clientKey = body.apiKey;
+    if ((clientKey !== undefined && (typeof clientKey !== 'string' || clientKey.length > 256)) ||
+        (body.model !== undefined && (typeof body.model !== 'string' || !/^gemini-[a-z0-9.-]{1,70}$/.test(body.model))) ||
+        (body.excludeTitles !== undefined && (!Array.isArray(body.excludeTitles) || body.excludeTitles.length > 25 || body.excludeTitles.some((title) => typeof title !== 'string' || title.length > 200)))) {
+      throw new RequestError('Invalid shuffle parameters', 400);
+    }
     const serverKey = process.env.GEMINI_API_KEY;
     const apiKey = clientKey?.trim() || serverKey?.trim();
     const excludeTitles: string[] = Array.isArray(body.excludeTitles) ? body.excludeTitles : [];
@@ -365,7 +372,7 @@ export async function POST(request: NextRequest) {
 
     // If API key is available, query Gemini LLM for an unscripted, creative random question
     if (apiKey) {
-      const requestedModel = body.model?.trim() || "gemini-3.5-flash-lite";
+      const requestedModel = typeof body.model === "string" ? body.model.trim() : "gemini-3.5-flash-lite";
       const candidateModels = Array.from(
         new Set([
           requestedModel,
@@ -399,13 +406,12 @@ You MUST return ONLY a valid JSON object matching this schema:
 
       for (const model of candidateModels) {
         try {
-          const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(
-            apiKey
-          )}`;
+          const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
-          const res = await fetch(geminiUrl, {
+          const res = await fetchWithLimits(geminiUrl, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+            signal,
             body: JSON.stringify({
               contents: [
                 {
@@ -415,11 +421,13 @@ You MUST return ONLY a valid JSON object matching this schema:
               ],
               generationConfig: {
                 temperature: 1.15,
+                maxOutputTokens: 512,
                 topP: 0.95,
                 responseMimeType: "application/json",
               },
             }),
-          });
+          }, 10000, 64 * 1024);
+          if (!res.ok && res.status !== 404) break;
 
           if (res.ok) {
             const data = await res.json();
@@ -428,11 +436,11 @@ You MUST return ONLY a valid JSON object matching this schema:
               const cleaned = rawText.replace(/^\`\`\`(?:json)?\s*/i, "").replace(/\s*\`\`\`$/i, "").trim();
               const parsed = JSON.parse(cleaned);
 
-              if (parsed.title && parsed.prompt) {
+              if (typeof parsed.title === 'string' && typeof parsed.prompt === 'string' && parsed.title.trim() && parsed.prompt.trim() && parsed.title.length <= 200 && parsed.prompt.length <= 1000 && !excludeTitles.some((title) => title.toLowerCase() === parsed.title.trim().toLowerCase())) {
                 return NextResponse.json({
                   title: parsed.title.trim(),
-                  category: parsed.category?.trim() || randomDomain.split("&")[0].trim(),
-                  icon: parsed.icon?.trim() || "🔬",
+                  category: (typeof parsed.category === "string" ? parsed.category.trim().slice(0, 100) : "") || randomDomain.split("&")[0].trim(),
+                  icon: (typeof parsed.icon === "string" ? parsed.icon.trim().slice(0, 16) : "") || "🔬",
                   prompt: parsed.prompt.trim(),
                   source: "llm",
                   model,
@@ -442,7 +450,8 @@ You MUST return ONLY a valid JSON object matching this schema:
             }
           }
         } catch {
-          // Cascade to next candidate model
+          signal.throwIfAborted();
+          break; // Network/authentication failures do not improve by changing models.
         }
       }
     }
@@ -461,6 +470,11 @@ You MUST return ONLY a valid JSON object matching this schema:
       seed: entropySeed,
     });
   } catch (err: unknown) {
+    if (err instanceof RequestError || signal.aborted) {
+      return NextResponse.json({ error: err instanceof RequestError ? err.message : 'Shuffle cancelled or timed out' }, {
+        status: signal.aborted ? (request.signal.aborted ? 499 : 504) : (err as RequestError).status,
+      });
+    }
     const randomIndex = crypto.randomInt(0, CURATED_FALLBACK_POOL.length);
     const randomPick = CURATED_FALLBACK_POOL[randomIndex];
     return NextResponse.json({

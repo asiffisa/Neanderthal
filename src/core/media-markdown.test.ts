@@ -8,6 +8,26 @@ import {
 } from './media-markdown';
 
 describe('Neanderthal Markdown contract', () => {
+  it.each([
+    '`The ![Electric eel](neanderthal:image)`',
+    '``The ![Electric eel](neanderthal:image) and `code` ``',
+    '```md\nThe ![Electric eel](neanderthal:image)\n```',
+    '````md\n```\nThe ![Electric eel](neanderthal:image)\n```\n````',
+    '    The ![Electric eel](neanderthal:image)',
+    '```md\n![Unfinished',
+    '~~~md\n![media:Unfinished',
+    '\\![Unfinished',
+    'The \\![Electric eel](neanderthal:image)',
+    '<div>\nThe ![Electric eel](neanderthal:image)\n</div>',
+  ])('preserves literal code/escaped content: %s', (markdown) => {
+    expect(prepareNeanderthalMarkdown(markdown, true)).toBe(markdown);
+  });
+
+  it('preserves legacy-looking tokens in long and unfinished fences', () => {
+    const markdown = '````md\n```\n![media:Example|wiki]\n```\n';
+    expect(normalizeLegacyMediaMarkdown(markdown)).toBe(markdown);
+  });
+
   it('creates the minimal CommonMark-compatible image form', () => {
     expect(createNeanderthalMediaMarkdown('Neanderthal skull')).toBe(
       '![Neanderthal skull](neanderthal:image)'
@@ -72,5 +92,13 @@ describe('Neanderthal Markdown contract', () => {
     const alreadyPresent =
       'The electric eel ![Electric eel](neanderthal:image) generates charge.';
     expect(prepareNeanderthalMarkdown(alreadyPresent, false)).toBe(alreadyPresent);
+  });
+
+  it('snaps trailing punctuation flush against capsules without stray spaces', () => {
+    const spaced =
+      'The perivascular space ![Perivascular space](neanderthal:image) . Simultaneously, delta waves ![Delta waves](neanderthal:image) , synchronize.';
+    expect(prepareNeanderthalMarkdown(spaced, false)).toBe(
+      'The perivascular space ![Perivascular space](neanderthal:image). Simultaneously, delta waves ![Delta waves](neanderthal:image), synchronize.'
+    );
   });
 });

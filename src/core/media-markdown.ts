@@ -1,3 +1,5 @@
+import { fromMarkdown } from 'mdast-util-from-markdown';
+import type { Nodes } from 'mdast';
 import { MediaType } from './types';
 
 export const NEANDERTHAL_MEDIA_SCHEME = 'neanderthal:';
@@ -133,102 +135,117 @@ export function createNeanderthalMediaMarkdown(
   return `![${escapedQuery}](${createNeanderthalMediaSource(options)})`;
 }
 
-const CODE_OR_LEGACY_MEDIA_REGEX =
-  /(```[\s\S]*?```|~~~[\s\S]*?~~~|`[^`\n]+`)|(!\[media:([^\]]+)\](?:\(([^)]+)\))?)/g;
+/** Reuse the CommonMark parser so fences, escapes and inline code agree with rendering. */
+export function visitMarkdown(markdown: string, visit: (node: Nodes) => void): void {
+  const pending: Nodes[] = [fromMarkdown(markdown)];
+  while (pending.length) {
+    const node = pending.pop()!;
+    visit(node);
+    if ('children' in node) pending.push(...[...node.children].reverse());
+  }
+}
 
-/** Keep old demo content working while the public syntax moves to CommonMark images. */
-export function normalizeLegacyMediaMarkdown(markdown: string): string {
-  return markdown.replace(
-    CODE_OR_LEGACY_MEDIA_REGEX,
-    (match, codeBlock, _mediaMatch, rawDescriptor, fallbackUrl) => {
-      if (codeBlock) return codeBlock;
+function isEscaped(markdown: string, index: number): boolean {
+  let slashes = 0;
+  while (index > 0 && markdown[--index] === '\\') slashes++;
+  return slashes % 2 === 1;
+}
 
-      const descriptor = parseLegacyMediaAlt(`media:${String(rawDescriptor)}`);
-      if (!descriptor) return match;
-
-      return createNeanderthalMediaMarkdown(descriptor.query, {
-        vendorPreference: descriptor.vendorPreference,
-        fallbackUrl: typeof fallbackUrl === 'string' ? fallbackUrl.trim() : undefined,
-      });
+function literalRanges(markdown: string): Array<[number, number]> {
+  const ranges: Array<[number, number]> = [];
+  visitMarkdown(markdown, (node) => {
+    if (['code', 'inlineCode', 'html', 'definition'].includes(node.type) && node.position) {
+      ranges.push([node.position.start.offset!, node.position.end.offset!]);
     }
-  );
+  });
+  return ranges;
+}
+
+/** Upgrade legacy markers, preserving literal examples and escaped Markdown. */
+export function normalizeLegacyMediaMarkdown(markdown: string): string {
+  if (!markdown.includes('![media:')) return markdown;
+  const literals = literalRanges(markdown);
+  return markdown.replace(LEGACY_MEDIA_REGEX, (match, rawDescriptor, fallbackUrl, offset) => {
+    if (isEscaped(markdown, offset) || literals.some(([start, end]) => offset >= start && offset < end)) return match;
+    const descriptor = parseLegacyMediaAlt(`media:${String(rawDescriptor)}`);
+    if (!descriptor) return match;
+    return createNeanderthalMediaMarkdown(descriptor.query, {
+      vendorPreference: descriptor.vendorPreference,
+      fallbackUrl: typeof fallbackUrl === 'string' ? fallbackUrl.trim() : undefined,
+    });
+  });
 }
 
 function findTrailingIncompleteImage(markdown: string): number {
   const start = markdown.lastIndexOf('![');
-  if (start < 0) return -1;
-
-  const tail = markdown.slice(start);
-  const altEnd = tail.indexOf(']');
-
-  if (altEnd < 0) return start;
-
-  const afterAlt = tail.slice(altEnd + 1);
+  if (start < 0 || isEscaped(markdown, start)) return -1;
+  let depth = 1;
+  let index = start + 2;
+  for (; index < markdown.length; index++) {
+    if (isEscaped(markdown, index)) continue;
+    if (markdown[index] === '[') depth++;
+    if (markdown[index] === ']' && --depth === 0) break;
+  }
+  if (depth > 0) return start;
+  const afterAlt = markdown.slice(index + 1);
   if (!afterAlt) return start;
-
-  if (afterAlt.startsWith('(') && !afterAlt.includes(')')) {
-    return start;
+  if (afterAlt[0] !== '(' && afterAlt[0] !== '[') return -1;
+  const open = afterAlt[0], close = open === '(' ? ')' : ']';
+  depth = 1;
+  for (let i = 1; i < afterAlt.length; i++) {
+    if (isEscaped(afterAlt, i)) continue;
+    if (afterAlt[i] === open) depth++;
+    if (afterAlt[i] === close && --depth === 0) return -1;
   }
-
-  if (afterAlt.startsWith('[') && !afterAlt.includes(']')) {
-    return start;
-  }
-
-  return -1;
+  return start;
 }
 
-/**
- * Ensures that if an image pill was placed without the noun in text
- * (e.g. "The ![Electric eel](neanderthal:image) achieves..." or "modified ![muscle](neanderthal:image) tissue"),
- * the noun is restored directly in the text so the prose remains 100% complete, readable, and grammatical.
- * The pill acts as a supportive layer, never replacing the words.
- */
+function rewriteMediaProse(markdown: string, isStreaming: boolean): string {
+  if (!markdown.includes('![')) return markdown;
+  const edits: Array<{ start: number; end: number; text: string }> = [];
+  const partialStart = isStreaming ? findTrailingIncompleteImage(markdown) : -1;
+  let partialIsLiteral = false;
+  visitMarkdown(markdown, (node) => {
+    const start = node.position?.start.offset;
+    const end = node.position?.end.offset;
+    if (start === undefined || end === undefined) return;
+    if (['code', 'inlineCode', 'html', 'definition'].includes(node.type) && partialStart >= start && partialStart < end) {
+      partialIsLiteral = true;
+    }
+    if (node.type !== 'image') return;
+    const descriptor = parseNeanderthalMediaSource(node.url);
+    const query = node.alt?.trim();
+    if (!descriptor || descriptor.isPartial || !query || query.toLowerCase() === 'visualizing…') return;
+    const before = markdown.slice(0, start);
+    const prefix = before.match(/\b(?:the|a|an|this|that|these|those|each|every|all|its|their|his|her|individual|modified|specialized|serial|single|disc-like)\s+$/i)?.[0];
+    if ((prefix && !prefix.toLowerCase().includes(query.toLowerCase())) || /(^|[.!?]\s+)$/.test(before)) {
+      // Alt text is decoded by the parser; escape it before inserting it into prose.
+      const text = query.replace(/&/g, '&amp;').replace(/([\\`*_[\]<>])/g, '\\$1');
+      edits.push({ start, end: start, text: `${text} ` });
+    }
+
+    // Eliminate ugly gaps between an inline capsule and trailing punctuation (e.g. `[capsule] .` -> `[capsule].`)
+    const after = markdown.slice(end);
+    const punctMatch = after.match(/^([ \t]+)([.,;:!?])/);
+    if (punctMatch) {
+      edits.push({ start: end, end: end + punctMatch[1].length, text: '' });
+    }
+  });
+  if (partialStart >= 0 && !partialIsLiteral) {
+    edits.push({ start: partialStart, end: markdown.length, text: createNeanderthalMediaMarkdown('Visualizing…', { partial: true }) });
+  }
+  for (const edit of edits.sort((a, b) => b.start - a.start)) {
+    markdown = markdown.slice(0, edit.start) + edit.text + markdown.slice(edit.end);
+  }
+  return markdown;
+}
+
+/** Repair omitted nouns only on actual Markdown image nodes, never inside code. */
 export function ensureTextAccompaniesPills(markdown: string): string {
-  // 1. Pill at beginning of sentence/line without preceding noun
-  let res = markdown.replace(
-    /(^|[.!?]\s+)(!\[([^\]]+)\]\((neanderthal:image[^\)]*)\))/g,
-    (match, boundary, fullPill, query) => {
-      const q = query.trim();
-      if (!q || q.toLowerCase() === 'visualizing…') return match;
-      return `${boundary}${q} ${fullPill}`;
-    }
-  );
-
-  // 2. Pill immediately following an article, pronoun, or adjective where the noun was omitted
-  res = res.replace(
-    /(\b(?:the|a|an|this|that|these|those|each|every|all|its|their|his|her|individual|modified|specialized|serial|single|disc-like)\s+)(!\[([^\]]+)\]\((neanderthal:image[^\)]*)\))/gi,
-    (match, prefix, fullPill, query) => {
-      const cleanQ = query.trim().toLowerCase();
-      if (!cleanQ || cleanQ === 'visualizing…') return match;
-      const prefixLower = prefix.toLowerCase();
-
-      // If the text before the pill already ends with or includes the noun, don't duplicate
-      if (prefixLower.includes(cleanQ)) return match;
-
-      return `${prefix}${query.trim()} ${fullPill}`;
-    }
-  );
-
-  return res;
+  return rewriteMediaProse(markdown, false);
 }
 
-/**
- * Hide an unfinished image marker during streaming and ensure nouns accompany pills.
- * Legacy tokens are upgraded later in the Markdown tree so code remains literal.
- * The temporary capsule never starts a network request.
- */
-export function prepareNeanderthalMarkdown(
-  markdown: string,
-  isStreaming: boolean = false
-): string {
-  const normalized = normalizeLegacyMediaMarkdown(markdown);
-  const enhanced = ensureTextAccompaniesPills(normalized);
-  if (!isStreaming) return enhanced;
-
-  const partialStart = findTrailingIncompleteImage(enhanced);
-  if (partialStart < 0) return enhanced;
-
-  return `${enhanced.slice(0, partialStart)}${createNeanderthalMediaMarkdown('Visualizing…', {
-    partial: true,
-  })}`;
+/** Unfinished prose images become non-resolving placeholders during a stream. */
+export function prepareNeanderthalMarkdown(markdown: string, isStreaming = false): string {
+  return rewriteMediaProse(normalizeLegacyMediaMarkdown(markdown), isStreaming);
 }

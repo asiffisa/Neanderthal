@@ -46,7 +46,7 @@ export const DEFAULT_CAPSULE_SETTINGS: CapsuleSettings = {
   borderRadius: 8,
   gap: 6,
   verticalOffset: -2,
-  visualsPerParagraph: 5,
+  visualsPerParagraph: 4,
   showHoverCard: true,
   hoverScale: false,
   opticalAlignment: 'middle',

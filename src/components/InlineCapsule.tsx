@@ -5,7 +5,8 @@ import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import { ExternalLink, Maximize2, Sparkles } from 'lucide-react';
 import { CapsuleSettings, ResolvedMedia } from '../core/types';
-import { resolveMedia } from '../lib/wikimedia';
+import { mediaFallback, resolveMedia, resolveUniqueMedia } from '../lib/wikimedia';
+import { canonicalImageUrl } from '../lib/media-url';
 
 interface InlineCapsuleProps {
   query: string;
@@ -74,61 +75,28 @@ export const InlineCapsule: React.FC<InlineCapsuleProps> = memo(({
       return;
     }
 
-    let isCurrent = true;
+    const controller = new AbortController();
+    const capsuleKey = id || query;
+    setMedia({ query, title: query, status: 'loading' });
 
     async function loadUniqueMedia() {
-      // 1. Initial resolution with query occurrence index
-      let res = await resolveMedia(
-        query,
-        fallbackUrl,
-        vendorPreference,
-        undefined,
-        occurrenceIndex,
-        context
-      );
-
-      if (!isCurrent) return;
-
-      // 2. Anti-duplication check: if another capsule in this document already displays this image URL
-      if (claimedUrlsRef && res.thumbnailUrl) {
-        const capsuleKey = id || query;
-        const isDuplicate = Array.from(claimedUrlsRef.current.entries()).some(
-          ([otherId, url]) => otherId !== capsuleKey && url === res.thumbnailUrl
+      try {
+        const resolve = (excluded: string[], attempt: number) => resolveMedia(
+          query, fallbackUrl, vendorPreference, excluded, occurrenceIndex + attempt, context, controller.signal
         );
-
-        if (isDuplicate) {
-          // Collision detected! Fetch alternative image excluding this duplicate URL
-          const altRes = await resolveMedia(
-            query,
-            fallbackUrl,
-            vendorPreference,
-            res.thumbnailUrl,
-            occurrenceIndex + 1,
-            context
-          );
-
-          if (isCurrent && altRes.thumbnailUrl) {
-            res = altRes;
-          }
-        }
-
-        if (res.thumbnailUrl) {
-          claimedUrlsRef.current.set(capsuleKey, res.thumbnailUrl);
-        }
-      }
-
-      if (isCurrent) {
-        setMedia(res);
+        const result = claimedUrlsRef
+          ? await resolveUniqueMedia(resolve, claimedUrlsRef.current, capsuleKey, controller.signal)
+          : await resolve([], 0);
+        if (!controller.signal.aborted) setMedia(result);
+      } catch {
+        if (!controller.signal.aborted) setMedia(mediaFallback(query, fallbackUrl));
       }
     }
 
-    loadUniqueMedia();
-
+    void loadUniqueMedia();
     return () => {
-      isCurrent = false;
-      if (claimedUrlsRef && (id || query)) {
-        claimedUrlsRef.current.delete(id || query);
-      }
+      controller.abort();
+      claimedUrlsRef?.current.delete(capsuleKey);
     };
   }, [query, fallbackUrl, vendorPreference, isPartial, occurrenceIndex, id, claimedUrlsRef, context]);
 
@@ -199,6 +167,25 @@ export const InlineCapsule: React.FC<InlineCapsuleProps> = memo(({
     }, 200);
   };
 
+  const handleImageError = () => {
+    const capsuleKey = id || query;
+    const fallback = mediaFallback(query, fallbackUrl);
+    const fallbackId = fallback.thumbnailUrl ? canonicalImageUrl(fallback.thumbnailUrl) : undefined;
+    const alreadyUsed = fallbackId && claimedUrlsRef && [...claimedUrlsRef.current].some(
+      ([owner, url]) => owner !== capsuleKey && canonicalImageUrl(url) === fallbackId
+    );
+    claimedUrlsRef?.current.delete(capsuleKey);
+    if (fallbackId && fallbackId !== canonicalImageUrl(media.thumbnailUrl || '') && !alreadyUsed) {
+      claimedUrlsRef?.current.set(capsuleKey, fallbackId);
+      setImageLoaded(false);
+      setImageError(false);
+      setMedia(fallback);
+    } else {
+      setImageError(true);
+      setMedia({ ...media, thumbnailUrl: undefined, fullImageUrl: undefined, status: 'not-found' });
+    }
+  };
+
   const hasImage = media.status === 'loaded' && Boolean(media.thumbnailUrl);
   const isLoading = media.status === 'loading';
 
@@ -207,6 +194,12 @@ export const InlineCapsule: React.FC<InlineCapsuleProps> = memo(({
   const capsuleWidth = Math.round(capsuleHeight * 1.5);
   const borderRadius = settings.borderRadius;
 
+  // If the image failed to resolve or errored out, hide the capsule completely
+  // rather than showing an intrusive broken grey pill with a dot.
+  if (media.status === 'not-found' || imageError) {
+    return null;
+  }
+
   const containerStyle: React.CSSProperties = {
     display: 'inline-flex',
     alignItems: 'center',
@@ -214,7 +207,7 @@ export const InlineCapsule: React.FC<InlineCapsuleProps> = memo(({
     verticalAlign: settings.opticalAlignment,
     transform: `translateY(${settings.verticalOffset}px)`,
     marginLeft: `${settings.gap / 2}px`,
-    marginRight: `${settings.gap / 2}px`,
+    marginRight: 0,
     height: `${capsuleHeight}px`,
     minWidth: `${capsuleWidth}px`,
     width: `${capsuleWidth}px`,
@@ -267,7 +260,7 @@ export const InlineCapsule: React.FC<InlineCapsuleProps> = memo(({
                 decoding="async"
                 referrerPolicy="no-referrer"
                 onLoad={() => setImageLoaded(true)}
-                onError={() => setImageError(true)}
+                onError={handleImageError}
                 className={`h-full w-auto min-w-full object-cover transition-opacity duration-300 pointer-events-none ${
                   imageLoaded ? 'opacity-100' : 'opacity-0'
                 }`}
@@ -281,22 +274,11 @@ export const InlineCapsule: React.FC<InlineCapsuleProps> = memo(({
               <span className="absolute inset-0 bg-black/5 group-hover:bg-transparent transition-colors" />
             </>
           )}
-
-          {/* Fallback Badge (when image 404s, errors out, or not found) */}
-          {(media.status === 'not-found' || imageError) && (
-            <span
-              className="flex items-center justify-center w-full h-full text-zinc-300 bg-white/10 hover:bg-white/15 transition-colors"
-              title={media.title || query}
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 shrink-0" />
-              <span className="sr-only">{media.title || query}</span>
-            </span>
-          )}
         </motion.button>
       </span>
 
       {/* Portal-Mounted Hover Popover Card (Root-level Stacking Context, z-[99999]) */}
-      {mounted && isHovered && popoverCoords && (media.status === 'loaded' || imageError) && typeof document !== 'undefined' &&
+      {mounted && isHovered && popoverCoords && media.status === 'loaded' && typeof document !== 'undefined' &&
         createPortal(
           <motion.div
             key={`popover-${media.query}-${popoverCoords.placeBelow ? 'below' : 'above'}`}

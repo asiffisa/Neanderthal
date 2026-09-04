@@ -1,143 +1,93 @@
 # We Took the Pictures Out of Writing
 
-## Why AI should put them back
-
-Before humans wrote words, we made images.
-
-Neanderthals left deliberate marks on cave walls more than 57,000 years ago ![La Roche-Cotard Neanderthal finger tracings](neanderthal:image). Thousands of years later, *Homo sapiens* artists painted animals, people, and scenes. A 51,200-year-old cave painting in Sulawesi ![Leang Karampuang cave painting](neanderthal:image) may be the oldest surviving example of visual storytelling.
-
-These marks were not writing. We cannot read them like a sentence. But they reveal something basic about us: **humans used pictures to hold memory before we used scripts to hold language.**
-
-The cave wall was the first shared visual surface. The real breakthrough came later, when pictures learned to speak.
-
----
-
-## Egypt made images part of language
-
-Egyptian hieroglyphs were not simple drawings. They were a complete writing system.
-
-A sign could represent a sound, a whole word, or a category of meaning. Some signs, called **determinatives**, appeared at the end of a word. They were silent, but they helped the reader understand what kind of word it was—a person, place, action, object, or idea.
-
-The written word carried the sound. The image helped carry the meaning.
-
-Hieroglyphs were also designed as part of the larger visual scene. Scribes arranged them inside balanced rectangular groups ![Egyptian hieroglyphic quadrats](neanderthal:image). Birds, animals, and human figures faced toward the beginning of the line. On monuments, text and illustration could become so tightly connected that it was difficult to separate one from the other.
-
-For the Egyptians, reading was also an act of looking.
-
-This is the important lesson. Their images were not decorations placed around the text. **They did real work inside the language.**
-
-([UCL Digital Egypt](https://www.ucl.ac.uk/museums-static/digitalegypt/writing/system.html); [British Museum](https://www.britishmuseum.org/blog/eureka-finding-key-ancient-egypt))
-
----
-
-## The Maya built language from visual blocks
-
-Maya writing followed a similar idea through a different system.
-
-Maya glyphs combined signs for complete words with signs for syllables. The same word could sometimes be written as one visual symbol, several sound signs, or a mixture of both. These glyphs appeared on stone monuments, painted ceramics, and folded books ![Maya hieroglyphic codex](neanderthal:image).
-
-Each glyph was compact, visual, and linguistic at the same time. It could be inspected as an image and read as language.
-
-Maya and Egyptian writing prove the same point: **pictures and words do not have to live in separate boxes.** A script can carry sound, meaning, identity, and visual form together.
-
-([Smithsonian National Museum of the American Indian](https://maya.nmai.si.edu/calendar/reading-calendar-glyphs))
-
----
+*And why AI should put them back*
 
 ## Modern writing chose speed over visible meaning
 
-The alphabet was an incredible compression tool. A few reusable letters could represent speech without needing a unique picture for every object or idea.
+The letters in *bird* have no wings.
 
-That made writing faster, easier to reproduce, and powerful enough to handle almost any subject. But it also created a trade-off: the letters in *bird* have no wings. The word can name the thing without showing it.
+That's the deal the alphabet made. Two dozen reusable letters can write down anything anyone says, and nobody has to draw a new picture for every object in the world. Writing got fast, cheap to copy, and able to carry any subject at all.
 
-Over time, images moved outside the sentence. They became figures, diagrams, plates, galleries, thumbnails, and links. The reader often has to stop, scroll, or open another page to connect the words with the thing being described.
+What it gave up was visibility. A word can name a thing perfectly well without ever showing it to you.
 
-We did not completely abandon visual symbols. We still use arrows, currency signs, mathematical notation, interface icons, and emoji. But their role is narrow.
+So the pictures moved out of the sentence. They became figures, plates, diagrams, galleries, thumbnails, links. If you want to connect a word to the thing it names, you stop reading, scroll, click, open a tab, and pay for all of it in attention.
 
-Emoji can add emotion or tone. A citation can tell us where evidence exists. Neither lets us see and inspect the subject at the moment it enters the sentence.
+What's left inside the line is thin. Arrows, currency signs, math notation, interface icons, emoji. Emoji carry tone. A citation tells you evidence exists somewhere else. Neither one lets you see the thing at the moment its name shows up.
 
-Modern text did not forget images completely. **It pushed them out of the reading flow.**
+Modern text didn't forget images. It pushed them out of the reading flow.
+
+It wasn't always like this.
 
 ---
 
-## Put the visual where the meaning happens
+## The evolution of pictographic script
 
-Consider this sentence:
+Before we wrote words, we drew. Neanderthals pressed deliberate finger marks into a French cave wall more than 57,000 years ago. Artists in Sulawesi painted a hunting scene 51,200 years ago, the earliest known picture that tells a story. None of it is writing and none of it can be read as sentences, but it does prove one thing: humans held memory in pictures long before scripts held language.
+
+Then pictures learned to speak. For most of writing's history, images weren't placed next to the text. They *were* the text.
+
+**Egyptian hieroglyphs** were a full writing system, not a gallery of drawings. A sign could carry a sound, a whole word, or a category of meaning. The signs called determinatives, or classifiers, sat at the end of a word and were never spoken aloud. They told the reader what kind of thing the word was: a person, a place, an action, an idea. Letters carried the sound and the picture carried the sense. Scribes also packed signs into balanced square groups and turned birds and figures to face the start of the line, so a page of text held together as an image.
+
+**Maya glyphs** got to the same place by another road. Scribes combined word signs with syllable signs inside a roughly square block, one large main sign with smaller ones clipped to its edges. The same word could be written as a single picture, spelled out in syllables, or both at once. *B'alam*, jaguar, could be a jaguar's head or `b'a-la-ma`. Each block was compact, visual, and linguistic in one stroke. You could look at it and read it.
+
+They weren't alone.
+
+- **Cuneiform** started around 3300 BCE in Uruk as simplified drawings of real things, grain and cattle and tools, before speed and the stylus flattened them into abstract wedges.
+- **Chinese characters** still carry the idea. Most of them pair a sound part with a meaning part, and that meaning part works a lot like an Egyptian classifier. 木 quietly says *this concerns wood*.
+- **Aztec and Mixtec codices** were painted, not spelled. The images carried the story and the glyphs supplied names, places, and dates.
+- **Naxi Dongba** in southwestern China is the last picture writing still in use, held by a few dozen elderly priests.
+
+Across continents that never met, scribes landed on the same instinct. A picture can do work inside a sentence that a word can't do as well.
+
+---
+
+## Put the picture where the meaning happens
+
+Take a sentence:
 
 > Neanderthals shaped Mousterian stone tools to produce sharp cutting flakes.
 
-If you have never seen a Mousterian tool, the name gives you little to hold onto.
+If you've never seen a Mousterian tool, that name gives you nothing to hold on to. You either take the sentence on trust or leave the page to go find out.
 
-Now read it with a visual capsule:
+Neanderthal drops a small capsule right after the noun, sitting on the baseline, while the answer is still being written. Text streams in, the model spots the visual concept, and the capsule lands next to the word it belongs to. You glance at it, keep reading, and open it only if you want the full image and where it came from.
 
-> Neanderthals shaped Mousterian stone tools ![Mousterian stone tools](neanderthal:image) to produce sharp cutting flakes.
+It isn't an emoji and it isn't decoration. It's a piece of visual evidence, small while you read, open when you ask for it.
 
-You do not have to leave the sentence. You can glance at the object, keep reading, then open it if you want the full image and source.
-
-This is the idea behind **Neanderthal**: small visual capsules placed directly on the typographic baseline, attached to the exact words they explain.
-
-The capsule is not an emoji. It is not a decoration. It is a compact piece of visual evidence.
-
-Like a museum label folded into a pebble, it stays small while you read and opens when you want more.
+This is easier to try than to describe, so the playground below is live. Ask it something and watch where the capsules land.
 
 ---
 
-## Where this helps AI answers
+## A new layer, not more pictures
 
-AI can produce a fluent paragraph before the reader has understood its first unfamiliar term. Inline visuals can slow that gap without slowing the reading.
+Research on multimedia learning is direct about this. People understand words and pictures better when the two sit together, which is called the spatial contiguity principle. It argues for a visual right beside the phrase it explains instead of three paragraphs below it.
 
-They are most useful for:
+The same research warns you the other way too. Interesting but irrelevant images, the ones researchers call seductive details, reliably make comprehension worse. Readers keep the decoration and lose the argument.
 
-- **Unfamiliar objects:** fossils, tools, animals, artworks, buildings, and historical artifacts.
-- **Mechanisms:** anatomy, machines, scientific processes, and cause-and-effect explanations.
-- **Spatial ideas:** maps, interfaces, diagrams, and physical structures.
-- **Comparisons:** species, products, artistic styles, or stages of development.
-- **Primary evidence:** manuscripts, museum objects, specimens, and archival photographs.
+So the goal was never a picture on every line. It's zero distance between an unfamiliar idea and the one image that resolves it: an unfamiliar object, a mechanism, a spatial structure, a comparison, a piece of primary evidence. If the picture doesn't make the nearby idea easier to understand, it doesn't belong there.
 
-They are less useful for familiar objects, abstract transitions, opinions, or claims that an image cannot prove.
+None of this is a rollback to hieroglyphs. Words should keep doing what only words do, which is grammar, sequence, nuance, abstraction, argument. Images should do what only images do, which is form, scale, structure, difference, proof.
 
-The rule is simple: **if the image does not make the nearby idea easier to understand, it does not belong there.**
+What's new is that AI can join the two at the moment of explanation. It can spot the visual concept, find a trustworthy image, place it beside the right phrase, and keep the source attached.
 
----
+Cave paintings made stories visible. Egyptian and Maya scribes made pictures readable. The alphabet split them apart for speed.
 
-## More images do not mean more learning
-
-Research on multimedia learning shows that people generally understand related words and pictures better when they appear close together. This is called the **spatial contiguity principle**. It supports placing a visual beside the exact phrase it explains instead of several paragraphs away.
-
-But the same research gives a warning: interesting but irrelevant images can distract readers and reduce comprehension.
-
-The goal is not to fill every line with pictures. The goal is to remove the distance between an unfamiliar idea and the visual needed to understand it.
-
-([Richard Mayer, *Multimedia Learning*](https://doi.org/10.1017/CBO9781139164603.008); [González, Saux, and Burin, 2019](https://doi.org/10.14742/ajet.4577))
-
----
-
-## A new layer of writing
-
-Neanderthal is not trying to replace words with pictures or rebuild hieroglyphs for the internet.
-
-Words should continue doing what they do best: carrying grammar, sequence, detail, and abstract thought.
-
-Images should do what they do best: showing form, scale, structure, difference, and physical evidence.
-
-AI can connect the two at the moment of explanation. It can identify the visual concept, find a trustworthy image, place it beside the right phrase, and preserve its source.
-
-Cave paintings made stories visible. Egyptian and Maya scripts made images readable. Modern writing separated the image from the sentence.
-
-**Neanderthal brings it back—not as decoration, but as meaning.**
+Neanderthal puts them back on the same line, not as decoration, but as meaning.
 
 ---
 
 ## Sources
 
-- Marquet, Jean-Claude, et al. “The Earliest Unambiguous Neanderthal Engravings on Cave Walls.” *PLOS ONE*, 2023. [Read the study](https://doi.org/10.1371/journal.pone.0286568)
-- Oktaviana, Adhi Agus, et al. “Narrative Cave Art in Indonesia by 51,200 Years Ago.” *Nature*, 2024. [Read the study](https://doi.org/10.1038/s41586-024-07541-7)
-- UCL Digital Egypt. “The System of Egyptian Hieroglyphic Writing.” [Read the guide](https://www.ucl.ac.uk/museums-static/digitalegypt/writing/system.html)
-- UCL Digital Egypt. “Art and Script in Ancient Egypt.” [Read the guide](https://www.ucl.ac.uk/museums-static/digitalegypt/art/artscript.html)
-- Smithsonian National Museum of the American Indian. “Reading the Calendar Glyphs.” [Explore the guide](https://maya.nmai.si.edu/calendar/reading-calendar-glyphs)
-- Mayer, Richard E. *Multimedia Learning*. Cambridge University Press. [Read about spatial contiguity](https://doi.org/10.1017/CBO9781139164603.008)
-- W3C Web Accessibility Initiative. “Images Tutorial.” [Read the guidance](https://www.w3.org/WAI/tutorials/images/)
+- Marquet, Jean-Claude, et al. "The Earliest Unambiguous Neanderthal Engravings on Cave Walls." *PLOS ONE*, 2023. https://doi.org/10.1371/journal.pone.0286568
+- Oktaviana, Adhi Agus, et al. "Narrative Cave Art in Indonesia by 51,200 Years Ago." *Nature*, 2024. https://doi.org/10.1038/s41586-024-07541-7
+- UCL Digital Egypt. "The System of Egyptian Hieroglyphic Writing." https://www.ucl.ac.uk/museums-static/digitalegypt/writing/system.html
+- Goldwasser, Orly, and Susana Soler. "Semantic Classifiers (Determinatives) in the Ancient Egyptian Writing System." *Journal of Chinese Writing Systems*, 2024. https://doi.org/10.1177/25138502241226983
+- Tokovinine, Alexandre. *Beginner's Visual Catalog of Maya Hieroglyphs.* Mesoweb. https://www.mesoweb.com/resources/catalog/Tokovinine_Catalog.pdf
+- The Metropolitan Museum of Art. "The Origins of Writing." https://www.metmuseum.org/essays/the-origins-of-writing
+- Mexicolore. "An Introduction to Pre-Hispanic Mixtec Codices." https://www.mexicolore.co.uk/aztecs/writing/introduction-to-mixtec-codices
+- Leiden University Libraries. "The World's Last Picture Writing: Naxi Dongba Manuscripts." https://www.library.universiteitleiden.nl/news/2023/05/online-exhibition---the-worlds-last-picture-writing-naxi-dongba-manuscripts
+- Mayer, Richard E. *Multimedia Learning.* Cambridge University Press. https://doi.org/10.1017/CBO9781139164603.008
+- Mayer, Richard E., and Logan Fiorella. "Principles for Reducing Extraneous Processing in Multimedia Learning." *Cambridge Handbook of Multimedia Learning.* https://doi.org/10.1017/CBO9781139547369.015
 
 ---
 
-*The history in this essay is based on the linked archaeological and institutional sources. The argument that modern writing pushed images out of the reading flow—and that inline visual capsules can bring them back—is the design thesis behind Neanderthal.*
+*The history here rests on the linked archaeological and institutional sources. The argument, that the alphabet pushed images out of the reading flow and that inline visual capsules can bring them back, is the design thesis behind Neanderthal.*

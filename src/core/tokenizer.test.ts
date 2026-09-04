@@ -2,6 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { tokenizeStreamingMarkdown } from './tokenizer';
 
 describe('tokenizeStreamingMarkdown', () => {
+  it('does not collect code or escaped examples as media', () => {
+    const content = '`![Code](neanderthal:image)` and \\![Escaped](neanderthal:image).\n\n```md\n![Fenced](neanderthal:image)\n```';
+    expect(tokenizeStreamingMarkdown(content)).toEqual([{ type: 'text', content }]);
+  });
+
+  it('parses escaped brackets in descriptions consistently with Markdown', () => {
+    expect(tokenizeStreamingMarkdown('![A \\[specimen\\]](neanderthal:image)')[0]).toMatchObject({ type: 'media', query: 'A [specimen]' });
+  });
+
   it('extracts the public media syntax without consuming surrounding prose', () => {
     expect(
       tokenizeStreamingMarkdown(

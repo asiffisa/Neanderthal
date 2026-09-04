@@ -1,95 +1,128 @@
 import { ResolvedMedia } from '../core/types';
+import { BoundedCache } from './bounded-cache';
+import { canonicalImageUrl } from './media-url';
+import { abortable, fetchWithLimits } from './request-limits';
 
-// In-memory runtime cache across the active browser session
-const memoryCache = new Map<string, ResolvedMedia>();
-// In-flight request deduplication map to prevent redundant concurrent fetches
-const inFlightRequests = new Map<string, Promise<ResolvedMedia>>();
+const memoryCache = new BoundedCache<ResolvedMedia>(256, 1024 * 1024, 15 * 60 * 1000);
+const inFlightRequests = new Map<string, {
+  promise: Promise<ResolvedMedia>;
+  controller: AbortController;
+  consumers: number;
+}>();
 
-/**
- * Resolve media metadata from in-memory cache or Next.js live resolution API.
- * Deduplicates in-flight requests so simultaneous tokens share one network fetch.
- */
+function imageUrl(value: unknown): string | undefined {
+  if (typeof value !== 'string' || value.length > 4096) return undefined;
+  if (value.startsWith('/') && !value.startsWith('//')) return value;
+  try {
+    const url = new URL(value);
+    return ['https:', 'http:'].includes(url.protocol) && !url.username && !url.password ? url.href : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export function mediaFallback(query: string, fallbackUrl?: string): ResolvedMedia {
+  const url = imageUrl(fallbackUrl);
+  return { query, title: query, thumbnailUrl: url, fullImageUrl: url, status: url ? 'loaded' : 'not-found' };
+}
+
+/** Cached metadata is shared; a caller's fallback never enters that shared cache. */
 export async function resolveMedia(
   query: string,
   fallbackUrl?: string,
   vendorPreference: 'wikipedia' | 'duckduckgo' | 'auto' = 'auto',
-  excludeUrl?: string,
-  occurrence: number = 0,
-  context?: string
+  excludeUrl?: string | string[],
+  occurrence = 0,
+  context?: string,
+  signal?: AbortSignal,
 ): Promise<ResolvedMedia> {
-  const normalizedKey = `${query.trim().toLowerCase()}:${vendorPreference}:${excludeUrl || ''}:${occurrence}:${(context || '').trim().toLowerCase()}`;
+  signal?.throwIfAborted();
+  const excluded = (Array.isArray(excludeUrl) ? excludeUrl : excludeUrl ? [excludeUrl] : []).map(canonicalImageUrl).sort();
+  const key = JSON.stringify([query.trim().toLowerCase(), vendorPreference, excluded, occurrence, (context || '').trim().toLowerCase()]);
+  const cached = memoryCache.get(key);
+  if (cached) return { ...cached, query };
 
-  // 1. Check in-memory session cache
-  if (memoryCache.has(normalizedKey)) {
-    return memoryCache.get(normalizedKey)!;
-  }
+  let pending = inFlightRequests.get(key);
+  if (!pending) {
+    if (inFlightRequests.size >= 32) return mediaFallback(query, fallbackUrl);
+    const controller = new AbortController();
+    const params = new URLSearchParams({ q: query });
+    if (context) params.set('context', context);
+    if (vendorPreference !== 'auto') params.set('source', vendorPreference);
+    if (occurrence > 0) params.set('occurrence', String(occurrence));
+    for (const url of excluded) params.append('exclude', url);
 
-  // 2. Check if a request for this query is already in-flight
-  if (inFlightRequests.has(normalizedKey)) {
-    return inFlightRequests.get(normalizedKey)!;
-  }
-
-  // 3. Initiate fetch and store in-flight promise
-  const fetchPromise = (async (): Promise<ResolvedMedia> => {
-    try {
-      const url = `/api/resolve?q=${encodeURIComponent(query)}${
-        context ? `&context=${encodeURIComponent(context)}` : ''
-      }${
-        vendorPreference !== 'auto' ? `&source=${vendorPreference}` : ''
-      }${excludeUrl ? `&exclude=${encodeURIComponent(excludeUrl)}` : ''}${
-        occurrence > 0 ? `&occurrence=${occurrence}` : ''
-      }`;
-      const res = await fetch(url);
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data.thumbnailUrl) {
-          const resolved: ResolvedMedia = {
-            query,
-            title: data.title || query,
-            description: data.description,
-            thumbnailUrl: data.thumbnailUrl,
-            fullImageUrl: data.fullImageUrl || data.thumbnailUrl,
-            sourceUrl: data.sourceUrl,
-            width: data.width,
-            height: data.height,
-            vendor: data.vendor || (data.sourceUrl?.includes('duckduckgo') ? 'duckduckgo' : 'wikipedia'),
-            status: 'loaded',
-          };
-          memoryCache.set(normalizedKey, resolved);
-
-          // Eagerly preload the image into the browser's cache so it renders instantly
-          if (typeof window !== 'undefined' && resolved.thumbnailUrl) {
-            const img = new Image();
-            img.src = resolved.thumbnailUrl;
+    const promise = (async (): Promise<ResolvedMedia> => {
+      try {
+        const response = await fetchWithLimits(`/api/resolve?${params}`, { signal: controller.signal }, 16000, 128 * 1024);
+        if (response.ok) {
+          const data = await response.json();
+          const thumbnailUrl = imageUrl(data?.thumbnailUrl);
+          if (thumbnailUrl) {
+            const media: ResolvedMedia = {
+              query,
+              title: typeof data.title === 'string' ? data.title.slice(0, 500) : query,
+              description: typeof data.description === 'string' ? data.description.slice(0, 2000) : undefined,
+              thumbnailUrl,
+              fullImageUrl: imageUrl(data.fullImageUrl) || thumbnailUrl,
+              sourceUrl: imageUrl(data.sourceUrl),
+              width: typeof data.width === 'number' ? data.width : undefined,
+              height: typeof data.height === 'number' ? data.height : undefined,
+              vendor: data.vendor === 'duckduckgo' ? 'duckduckgo' : 'wikipedia',
+              status: 'loaded',
+            };
+            controller.signal.throwIfAborted();
+            memoryCache.set(key, media, JSON.stringify(media).length * 2);
+            return media;
           }
-
-          return resolved;
         }
+      } catch {
+        // Per-caller fallback below; transient errors are not cached.
       }
-    } catch (err) {
-      console.warn(`[Neanderthal] Failed to resolve media for query "${query}":`, err);
-    } finally {
-      inFlightRequests.delete(normalizedKey);
+      return mediaFallback(query);
+    })();
+    pending = { promise, controller, consumers: 0 };
+    inFlightRequests.set(key, pending);
+    const entry = pending;
+    void promise.finally(() => {
+      if (inFlightRequests.get(key) === entry) inFlightRequests.delete(key);
+    });
+  }
+
+  pending.consumers++;
+  try {
+    const media = await (signal ? abortable(pending.promise, signal) : pending.promise);
+    return media.thumbnailUrl ? { ...media, query } : mediaFallback(query, fallbackUrl);
+  } finally {
+    pending.consumers--;
+    if (!pending.consumers && inFlightRequests.get(key) === pending) {
+      inFlightRequests.delete(key);
+      pending.controller.abort();
     }
+  }
+}
 
-    // 4. Fallback if not found or network fails
-    const fallbackResult: ResolvedMedia = {
-      query,
-      title: query,
-      thumbnailUrl: fallbackUrl,
-      fullImageUrl: fallbackUrl,
-      vendor: vendorPreference === 'duckduckgo' ? 'duckduckgo' : 'wikipedia',
-      status: fallbackUrl ? 'loaded' : 'not-found',
-    };
-
-    // Only cache if it has a valid fallback URL; do not cache transient network failures forever
-    if (fallbackUrl) {
-      memoryCache.set(normalizedKey, fallbackResult);
+/** Claim images synchronously after each await so simultaneous capsules cannot collide. */
+export async function resolveUniqueMedia(
+  resolve: (excluded: string[], attempt: number) => Promise<ResolvedMedia>,
+  claims: Map<string, string>,
+  id: string,
+  signal: AbortSignal,
+): Promise<ResolvedMedia> {
+  let media: ResolvedMedia = { query: '', title: '', status: 'not-found' };
+  let excluded: string[] = [];
+  for (let attempt = 0; attempt < 3; attempt++) {
+    signal.throwIfAborted();
+    media = await resolve(excluded, attempt);
+    signal.throwIfAborted();
+    if (!media.thumbnailUrl) return media;
+    const identity = canonicalImageUrl(media.thumbnailUrl);
+    const taken = [...claims].filter(([owner]) => owner !== id).map(([, url]) => canonicalImageUrl(url));
+    if (!taken.includes(identity)) {
+      claims.set(id, identity);
+      return media;
     }
-
-    return fallbackResult;
-  })();
-
-  inFlightRequests.set(normalizedKey, fetchPromise);
-  return fetchPromise;
+    excluded = [...new Set([...excluded, ...taken, identity])].slice(-16);
+  }
+  return { ...media, thumbnailUrl: undefined, fullImageUrl: undefined, status: 'not-found' };
 }

@@ -63,7 +63,7 @@ export default function PlaygroundPage() {
   // Streaming state
   const [streamedText, setStreamedText] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
-  const [streamSpeed, setStreamSpeed] = useState<number>(30); // ms per chunk
+  const [streamSpeed, setStreamSpeed] = useState<number>(14); // ms per chunk
 
   // Inspector & UI settings
   const [activeTab, setActiveTab] = useState<'design' | 'media'>('design');
@@ -75,6 +75,33 @@ export default function PlaygroundPage() {
   const streamTimerRef = useRef<NodeJS.Timeout | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const streamContainerRef = useRef<HTMLDivElement | null>(null);
+  const mainColRef = useRef<HTMLElement>(null);
+  const [columnHeight, setColumnHeight] = useState<number | undefined>(undefined);
+  const [isDesktop, setIsDesktop] = useState(false);
+
+  // Synchronize the right column height precisely to the left column
+  useEffect(() => {
+    const updateSize = () => {
+      setIsDesktop(window.innerWidth >= 768);
+      if (mainColRef.current) {
+        setColumnHeight(mainColRef.current.offsetHeight);
+      }
+    };
+    updateSize();
+    window.addEventListener('resize', updateSize);
+    const observer = new ResizeObserver(() => {
+      if (mainColRef.current) {
+        setColumnHeight(mainColRef.current.offsetHeight);
+      }
+    });
+    if (mainColRef.current) {
+      observer.observe(mainColRef.current);
+    }
+    return () => {
+      window.removeEventListener('resize', updateSize);
+      observer.disconnect();
+    };
+  }, []);
 
   // Load API key & model choice from localStorage on mount
   useEffect(() => {
@@ -118,7 +145,7 @@ export default function PlaygroundPage() {
     }
 
     let currentIndex = 0;
-    const stepSize = 4; // chunk size for realistic LLM token burst
+    const stepSize = 8; // chunk size for realistic, rapid LLM token burst
 
     streamTimerRef.current = setInterval(() => {
       currentIndex += stepSize;
@@ -172,7 +199,7 @@ export default function PlaygroundPage() {
           prompt: promptText,
           apiKey,
           model: selectedModel,
-          visualsPerParagraph: capsuleSettings.visualsPerParagraph,
+          visualsPerParagraph: Math.min(4, Math.max(1, capsuleSettings.visualsPerParagraph ?? 4)),
         }),
         signal: controller.signal,
       });
@@ -340,29 +367,6 @@ export default function PlaygroundPage() {
     return candidate;
   }, [selectedPreset.title, selectedPreset.prompt]);
 
-  const preResolvedQueriesRef = useRef<Set<string>>(new Set());
-
-  useEffect(() => {
-    preResolvedQueriesRef.current.clear();
-  }, [selectedPreset.id]);
-
-  // Proactively pre-resolve media tokens in parallel as they stream in (once per distinct query)
-  useEffect(() => {
-    for (const token of mediaTokens) {
-      if (token.query && !token.isPartial && !preResolvedQueriesRef.current.has(token.query)) {
-        preResolvedQueriesRef.current.add(token.query);
-        resolveMedia(
-          token.query,
-          token.fallbackUrl,
-          token.vendorPreference,
-          undefined,
-          0,
-          activeEntityContext
-        );
-      }
-    }
-  }, [mediaTokens, activeEntityContext]);
-
   const handleSidebarMediaClick = async (
     query: string,
     fallbackUrl?: string,
@@ -447,7 +451,7 @@ export default function PlaygroundPage() {
         {/* Two-Column Layout: Left (Chat) + Right (Control Property) */}
         <div className="grid grid-cols-1 md:grid-cols-[1fr_290px] gap-4 items-start w-full">
           {/* Left Column: Chat & Live Streaming */}
-          <main className="flex flex-col gap-3.5 min-w-0">
+          <main ref={mainColRef} className="flex flex-col gap-3.5 min-w-0">
 
           {/* Chat Stream Card */}
           <div className="rounded-2xl bg-[#101114] border border-white/[0.08] shadow-2xl flex flex-col overflow-hidden">
@@ -548,10 +552,13 @@ export default function PlaygroundPage() {
         </main>
 
         {/* Right Column: Control Property Sidebar */}
-        <aside className="w-full md:w-[290px] shrink-0 flex flex-col gap-3.5">
-          <div className="rounded-2xl bg-[#101114] border border-white/[0.08] shadow-xl overflow-hidden flex flex-col">
+        <aside
+          style={isDesktop && columnHeight ? { height: `${columnHeight}px`, maxHeight: `${columnHeight}px` } : undefined}
+          className="w-full md:w-[290px] shrink-0 flex flex-col min-h-0"
+        >
+          <div className="rounded-2xl bg-[#101114] border border-white/[0.08] shadow-xl overflow-hidden flex flex-col h-full min-h-0">
             {/* Tabs */}
-            <div className="flex items-center border-b border-white/[0.08] bg-[#14151a] h-11">
+            <div className="flex items-center border-b border-white/[0.08] bg-[#14151a] h-11 shrink-0">
               <button
                 type="button"
                 onClick={() => setActiveTab('design')}
@@ -578,8 +585,8 @@ export default function PlaygroundPage() {
               </button>
             </div>
 
-            {/* Tab Contents */}
-            <div className="p-5 overflow-y-auto max-h-[calc(100vh-220px)] space-y-6 text-xs">
+            {/* Tab Contents: Fixed height matching left column with internal scroll */}
+            <div className="p-5 overflow-y-auto flex-1 min-h-0 space-y-6 text-xs">
               {/* Tab 1: Design Controls */}
               {activeTab === 'design' && (
                 <div className="space-y-5">
@@ -621,34 +628,46 @@ export default function PlaygroundPage() {
                     {
                       label: 'Visuals per Paragraph',
                       key: 'visualsPerParagraph',
-                      value: capsuleSettings.visualsPerParagraph ?? DEFAULT_CAPSULE_SETTINGS.visualsPerParagraph,
+                      value: Math.min(4, Math.max(1, capsuleSettings.visualsPerParagraph ?? 4)),
                       min: 1,
-                      max: 5,
+                      max: 4,
                       unit: ' / ¶',
                       hint: 'Target visual capsule density for each paragraph.',
                     },
-                  ].map((ctrl) => (
-                    <div key={ctrl.key}>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-medium text-zinc-300">{ctrl.label}</span>
-                        <span className="font-mono text-xs text-white font-semibold">{ctrl.value ?? ctrl.min}{ctrl.unit}</span>
+                  ].map((ctrl) => {
+                    const val = ctrl.value ?? ctrl.min ?? 0;
+                    const percent = Math.min(100, Math.max(0, ((val - ctrl.min) / (ctrl.max - ctrl.min)) * 100));
+                    return (
+                      <div key={ctrl.key}>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-medium text-zinc-300">{ctrl.label}</span>
+                          <span className="font-mono text-xs text-white font-semibold">{val}{ctrl.unit}</span>
+                        </div>
+                        <div className="relative flex items-center py-1">
+                          <input
+                            type="range"
+                            min={ctrl.min}
+                            max={ctrl.max}
+                            value={val}
+                            style={{
+                              background: `linear-gradient(to right, #f4f4f5 0%, #f4f4f5 ${percent}%, rgba(255, 255, 255, 0.12) ${percent}%, rgba(255, 255, 255, 0.12) 100%)`,
+                            }}
+                            onChange={(e) =>
+                              setCapsuleSettings((prev) => ({
+                                ...prev,
+                                [ctrl.key]:
+                                  ctrl.key === 'visualsPerParagraph'
+                                    ? Math.min(4, Math.max(1, Number(e.target.value)))
+                                    : Number(e.target.value),
+                              }))
+                            }
+                            className="monochrome-slider w-full cursor-pointer"
+                          />
+                        </div>
+                        {ctrl.hint && <span className="text-[11px] text-zinc-500 mt-1.5 block leading-normal">{ctrl.hint}</span>}
                       </div>
-                      <input
-                        type="range"
-                        min={ctrl.min}
-                        max={ctrl.max}
-                        value={ctrl.value ?? ctrl.min ?? 0}
-                        onChange={(e) =>
-                          setCapsuleSettings((prev) => ({
-                            ...prev,
-                            [ctrl.key]: Number(e.target.value),
-                          }))
-                        }
-                        className="w-full cursor-pointer"
-                      />
-                      {ctrl.hint && <span className="text-[11px] text-zinc-500 mt-1.5 block leading-normal">{ctrl.hint}</span>}
-                    </div>
-                  ))}
+                    );
+                  })}
 
                   <div className="pt-3 border-t border-white/10">
                     <button

@@ -1,89 +1,43 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { BoundedCache } from '../../../src/lib/bounded-cache';
+import { parseImageProxyUrl } from '../../../src/lib/media-url';
+import { fetchProxyImage } from '../../../src/lib/proxy-image';
+import { RequestError } from '../../../src/lib/request-limits';
 
 export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 
-interface CachedImage {
-  buffer: Uint8Array;
-  contentType: string;
-  timestamp: number;
-}
-
-const proxyMemoryCache = new Map<string, CachedImage>();
-const MAX_PROXY_CACHE = 300;
-const CACHE_TTL_MS = 1000 * 60 * 60 * 24; // 24 hours
-
-const USER_AGENT =
-  process.env.USER_AGENT ||
-  'NeanderthalApp/1.0 (https://github.com/asiffisa/Neanderthal; contact@example.com)';
+const cache = new BoundedCache<Awaited<ReturnType<typeof fetchProxyImage>>>(128, 32 * 1024 * 1024, 60 * 60 * 1000);
+let activeRequests = 0;
 
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const imageUrl = searchParams.get('url');
+  const url = parseImageProxyUrl(request.nextUrl.searchParams.get('url'));
+  if (!url) return NextResponse.json({ error: 'Image URL is not allowed' }, { status: 400 });
 
-  if (!imageUrl || !imageUrl.startsWith('http')) {
-    return NextResponse.json({ error: 'Missing or invalid url parameter' }, { status: 400 });
+  const headers = {
+    'Cache-Control': 'public, max-age=86400',
+    'X-Content-Type-Options': 'nosniff',
+    'Content-Security-Policy': "default-src 'none'; sandbox",
+    'Referrer-Policy': 'no-referrer',
+  };
+  const cached = cache.get(url.href);
+  if (cached) {
+    return new Response(cached.buffer, { headers: { ...headers, 'Content-Type': cached.contentType, 'X-Proxy-Cache': 'HIT' } });
   }
-
-  // 1. Check in-memory image buffer cache (Instant 1ms response)
-  const cached = proxyMemoryCache.get(imageUrl);
-  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
-    return new Response(cached.buffer, {
-      status: 200,
-      headers: {
-        'Content-Type': cached.contentType,
-        'Cache-Control': 'public, max-age=604800, immutable',
-        'X-Proxy-Cache': 'HIT',
-      },
-    });
+  // Bound transient buffers too, not only retained cache entries.
+  if (activeRequests >= 8) {
+    return NextResponse.json({ error: 'Image proxy is busy' }, { status: 503, headers: { 'Retry-After': '1' } });
   }
-
+  activeRequests++;
+  const signal = AbortSignal.any([request.signal, AbortSignal.timeout(5000)]);
   try {
-    const isWikimedia = imageUrl.includes('wikipedia.org') || imageUrl.includes('wikimedia.org');
-    const headers: Record<string, string> = {
-      'User-Agent': USER_AGENT,
-      'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
-    };
-    if (isWikimedia) {
-      headers['Referer'] = 'https://en.wikipedia.org/';
-    }
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4500);
-
-    const res = await fetch(imageUrl, {
-      headers,
-      signal: controller.signal,
-    });
-    clearTimeout(timeoutId);
-
-    if (!res.ok) {
-      return NextResponse.json({ error: `Upstream error: ${res.status}` }, { status: res.status });
-    }
-
-    const contentType = res.headers.get('content-type') || 'image/jpeg';
-    const arrayBuffer = await res.arrayBuffer();
-    const buffer = new Uint8Array(arrayBuffer);
-
-    // Cache image in memory (evict oldest if full)
-    if (proxyMemoryCache.size >= MAX_PROXY_CACHE) {
-      const oldestKey = proxyMemoryCache.keys().next().value;
-      if (oldestKey) proxyMemoryCache.delete(oldestKey);
-    }
-    proxyMemoryCache.set(imageUrl, {
-      buffer,
-      contentType,
-      timestamp: Date.now(),
-    });
-
-    return new Response(buffer, {
-      status: 200,
-      headers: {
-        'Content-Type': contentType,
-        'Cache-Control': 'public, max-age=604800, immutable',
-        'X-Proxy-Cache': 'MISS',
-      },
-    });
-  } catch (err: unknown) {
-    return NextResponse.json({ error: 'Failed to proxy image' }, { status: 500 });
+    const image = await fetchProxyImage(url.href, signal);
+    cache.set(url.href, image, image.buffer.byteLength);
+    return new Response(image.buffer, { headers: { ...headers, 'Content-Type': image.contentType, 'X-Proxy-Cache': 'MISS' } });
+  } catch (error) {
+    const status = signal.aborted ? (request.signal.aborted ? 499 : 504) : error instanceof RequestError ? error.status : 502;
+    return NextResponse.json({ error: status === 504 ? 'Image request timed out' : 'Image unavailable' }, { status, headers: { 'Cache-Control': 'no-store' } });
+  } finally {
+    activeRequests--;
   }
 }
