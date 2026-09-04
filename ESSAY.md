@@ -30,7 +30,9 @@ Across continents that never met, scribes landed on the same instinct. A picture
 
 Take a sentence:
 
-Neanderthals shaped Mousterian stone tools to produce sharp cutting flakes.
+> Neanderthals shaped Mousterian stone tools to produce sharp cutting flakes.
+
+> Neanderthals ![Neanderthal](neanderthal:image?provider=wikipedia&fallback=https%3A%2F%2Fupload.wikimedia.org%2Fwikipedia%2Fcommons%2F3%2F3c%2FNeanderthal_at_AMNH.jpg) shaped Mousterian stone tools ![Mousterian stone tools](neanderthal:image?provider=wikipedia&fallback=https%3A%2F%2Fupload.wikimedia.org%2Fwikipedia%2Fcommons%2F1%2F13%2FPointe_Moust%25C3%25A9rienne_MHNT_PRE_2009.0.205.4_De_Maret.jpg) to produce sharp cutting flakes.
 
 If you've never seen a Mousterian tool, that name gives you nothing to hold on to. You either take the sentence on trust or leave the page to go find out.
 

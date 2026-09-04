@@ -64,6 +64,14 @@
   margin-block-start: 24px;
 }
 
+.prose blockquote {
+  padding-inline-start: 18px;
+  border-inline-start: 2px solid rgb(255 255 255 / 20%);
+  color: #f4f4f5;
+  font-size: clamp(17px, 1.6vw, 19px);
+  line-height: 1.6;
+}
+
 .prose :is(ul, ol) {
   padding-inline-start: 24px;
 }
