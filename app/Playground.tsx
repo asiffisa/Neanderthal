@@ -4,7 +4,6 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import {
   Sliders,
   Image as ImageIcon,
-  Sparkles,
   ChevronRight,
   Send,
   Shuffle,
@@ -457,8 +456,7 @@ export default function Playground({ hasInitialServerKey = false }: PlaygroundPr
               )}
 
               {isLiveGenerating && !streamedText && (
-                <div className="flex items-center gap-2.5 text-xs text-zinc-400 py-12 justify-center animate-pulse">
-                  <Sparkles className="w-4 h-4 text-zinc-300 animate-spin" />
+                <div className="flex items-center text-xs text-zinc-400 py-12 justify-center animate-pulse">
                   <span>
                     {getModelFullLabel(selectedModel)} is
                     generating insights with visual capsules...
