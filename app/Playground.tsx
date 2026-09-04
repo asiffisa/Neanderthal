@@ -487,13 +487,15 @@ export default function Playground({ hasInitialServerKey = false }: PlaygroundPr
                 placeholder="Ask anything about science, nature, cosmos..."
                 className="w-full bg-[#101114] border border-white/[0.08] focus:border-white/25 focus:ring-1 focus:ring-white/20 rounded-xl pl-4 pr-12 py-3 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none shadow-md transition-all"
               />
-              <button
-                type="submit"
-                className="absolute right-1.5 top-1/2 -translate-y-1/2 h-8 w-8 rounded-lg bg-white hover:bg-zinc-200 text-black font-semibold transition-all shadow-sm active:scale-[0.96] flex items-center justify-center"
-                title="Send query"
-              >
-                <Send className="w-3.5 h-3.5 text-black" />
-              </button>
+              {Boolean(customInput.trim()) && (
+                <button
+                  type="submit"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7 rounded-lg bg-white hover:bg-zinc-200 text-black font-semibold transition-all shadow-sm active:scale-[0.96] flex items-center justify-center"
+                  title="Send query"
+                >
+                  <Send className="w-3.5 h-3.5 text-black translate-x-[0.5px] -translate-y-[0.5px]" />
+                </button>
+              )}
             </div>
           </form>
         </div>
