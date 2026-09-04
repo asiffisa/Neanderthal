@@ -15,7 +15,7 @@ export async function GET() {
   return NextResponse.json(
     {
       hasServerKey,
-      model: "gemini-3.8-flash",
+      model: process.env.GEMINI_MODEL?.trim() || "gemini-3.5-flash-lite",
     },
     {
       headers: {

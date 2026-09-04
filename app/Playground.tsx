@@ -53,7 +53,7 @@ export default function Playground({ hasInitialServerKey = false }: PlaygroundPr
   // Gemini API Key & Model state
   const [hasServerKey, setHasServerKey] = useState<boolean>(hasInitialServerKey);
   const [apiKey, setApiKey] = useState<string>('');
-  const [selectedModel, setSelectedModel] = useState<string>('gemini-3.8-flash');
+  const [selectedModel, setSelectedModel] = useState<string>('gemini-3.5-flash-lite');
   const isKeyActive = Boolean(hasServerKey || apiKey.trim());
   const [isLiveGenerating, setIsLiveGenerating] = useState<boolean>(false);
   const [apiError, setApiError] = useState<string | null>(null);
@@ -107,7 +107,7 @@ export default function Playground({ hasInitialServerKey = false }: PlaygroundPr
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedKey = localStorage.getItem('neanderthal_gemini_key') || '';
-      const savedModel = localStorage.getItem('neanderthal_gemini_model') || 'gemini-3.8-flash';
+      const savedModel = localStorage.getItem('neanderthal_gemini_model') || 'gemini-3.5-flash-lite';
       setApiKey(savedKey);
       setSelectedModel(savedModel);
 
@@ -117,6 +117,9 @@ export default function Playground({ hasInitialServerKey = false }: PlaygroundPr
         .then((data) => {
           if (data && typeof data.hasServerKey === 'boolean') {
             setHasServerKey(data.hasServerKey);
+          }
+          if (data && typeof data.model === 'string' && data.model) {
+            setSelectedModel(data.model);
           }
         })
         .catch(() => {});

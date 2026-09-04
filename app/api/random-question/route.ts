@@ -372,7 +372,8 @@ export async function POST(request: NextRequest) {
 
     // If API key is available, query Gemini LLM for an unscripted, creative random question
     if (apiKey) {
-      const requestedModel = typeof body.model === "string" ? body.model.trim() : "gemini-3.5-flash-lite";
+      const defaultModel = process.env.GEMINI_MODEL?.trim() || "gemini-3.5-flash-lite";
+      const requestedModel = typeof body.model === "string" ? body.model.trim() : defaultModel;
       const candidateModels = Array.from(
         new Set([
           requestedModel,

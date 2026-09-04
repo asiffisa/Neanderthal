@@ -103,13 +103,14 @@ export async function POST(request: NextRequest) {
         : 4;
     const systemInstructionText = buildSystemInstruction(requestedVisuals, prompt);
 
-    const requestedModel = typeof body.model === 'string' ? body.model.trim() : 'gemini-3.8-flash';
+    const defaultModel = process.env.GEMINI_MODEL?.trim() || 'gemini-3.5-flash-lite';
+    const requestedModel = typeof body.model === 'string' ? body.model.trim() : defaultModel;
     const candidateModels = Array.from(
       new Set([
         requestedModel,
+        'gemini-3.5-flash-lite',
         'gemini-3.8-flash',
         'gemini-3.6-flash',
-        'gemini-3.5-flash-lite',
         'gemini-2.5-flash',
         'gemini-1.5-flash',
       ])
