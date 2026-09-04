@@ -264,6 +264,8 @@ export async function POST(request: NextRequest) {
       ? err.message
       : signal.aborted
       ? 'Generation cancelled or timed out'
+      : err instanceof Error && err.message === 'fetch failed'
+      ? 'Unable to reach Google Gemini API. Please check your internet connection or network proxy.'
       : err instanceof Error
       ? err.message
       : 'Could not complete generation';

@@ -231,6 +231,19 @@ export default function PlaygroundPage() {
       const msg = err instanceof Error ? err.message : 'Streaming error occurred';
       console.error('[Gemini Stream Error]:', msg);
       if (abortControllerRef.current === controller) {
+        // Graceful fallback: If this topic has a curated scripted response, recover smoothly!
+        const matchingPreset = PRESETS.find(
+          (p) =>
+            p.title.toLowerCase() === title.toLowerCase() ||
+            p.prompt.toLowerCase() === promptText.toLowerCase()
+        );
+        if (matchingPreset && matchingPreset.response) {
+          console.warn('[Gemini Stream]: Recovered smoothly using pre-scripted response for:', title);
+          setSelectedPreset(matchingPreset);
+          startStreaming(matchingPreset.response);
+          setApiError(null);
+          return;
+        }
         setApiError(msg);
       }
     } finally {
