@@ -499,7 +499,7 @@ export default function Playground({ hasInitialServerKey = false }: PlaygroundPr
         </div>
 
         {/* Right Column: Control Property Sidebar */}
-        <aside className="w-full md:w-[290px] shrink-0 flex flex-col h-full min-h-0">
+        <aside className="w-full md:w-[290px] shrink-0 flex flex-col md:h-[580px] min-h-0">
           <div className="rounded-2xl bg-[#101114] border border-white/[0.08] shadow-xl overflow-hidden flex flex-col h-full min-h-0">
             {/* Tabs */}
             <div className="flex items-center border-b border-white/[0.08] bg-[#14151a] h-11 shrink-0">
