@@ -3,7 +3,8 @@ import { NextRequest, NextResponse } from 'next/server';
 export const dynamic = 'force-dynamic';
 
 const USER_AGENT =
-  'NeanderthalApp/1.0 (https://github.com/asif/neanderthal; contact@neanderthal-demo.com)';
+  process.env.USER_AGENT ||
+  'NeanderthalApp/1.0 (https://github.com/asiffisa/Neanderthal; contact@example.com)';
 
 // Stop-words and descriptive adjectives to strip when simplifying complex phrases
 const STOP_WORDS = new Set([
@@ -42,32 +43,121 @@ function simplifyQuery(query: string): string {
   return words.slice(0, 3).join(' ');
 }
 
-function isRelevantWikipediaPage(pageTitle: string, query: string, context?: string): boolean {
+const cleanAlphanumeric = (s: string) => s.toLowerCase().replace(/[^\w]/g, '');
+
+function isRelevantWikipediaPage(pageTitle: string, query: string, context?: string, extract?: string): boolean {
+  if (!pageTitle || !query) return false;
+
+  const alphaTitle = cleanAlphanumeric(pageTitle);
+  const alphaQuery = cleanAlphanumeric(query);
+
+  // 1. Direct alphanumeric match (handles compound words like "Shock wave" vs "Shockwave", "deep sea" vs "deepsea")
+  if (alphaTitle === alphaQuery || alphaTitle.includes(alphaQuery) || alphaQuery.includes(alphaTitle)) {
+    return true;
+  }
+
   const normalize = (s: string) =>
     s.toLowerCase().replace(/[^\w\s]/g, '').split(/\s+/).filter(w => !STOP_WORDS.has(w) && w.length > 2);
 
   const titleTokens = normalize(pageTitle);
   const queryTokens = normalize(query);
   const contextTokens = context ? normalize(context) : [];
-
-  // Direct containment: if title contains query or query contains title
   const lowerTitle = pageTitle.toLowerCase();
-  const lowerQuery = query.toLowerCase();
-  if (lowerTitle.includes(lowerQuery) || lowerQuery.includes(lowerTitle)) {
-    return true;
+  const lowerExtract = (extract || '').toLowerCase();
+
+  // 2. Multi-word query check: ensure at least 2 tokens match or >= 60% of tokens match
+  if (queryTokens.length >= 2) {
+    const matched = queryTokens.filter(
+      (q) => titleTokens.includes(q) || lowerTitle.includes(q) || lowerExtract.includes(q)
+    ).length;
+    return matched >= 2 || matched / queryTokens.length >= 0.6;
   }
 
-  // Token overlap check with query
+  // 3. Single-token overlap check with query
   const hasQueryTokenMatch = queryTokens.some(q => titleTokens.includes(q) || lowerTitle.includes(q));
   if (hasQueryTokenMatch) return true;
 
-  // Token overlap check with context (if context is a concise entity)
+  // 4. Token overlap check with context (if context is a concise entity)
   if (contextTokens.length > 0 && contextTokens.length <= 3) {
     const hasContextMatch = contextTokens.some(c => titleTokens.includes(c) || lowerTitle.includes(c));
     if (hasContextMatch) return true;
   }
 
   return false;
+}
+
+function scoreWikipediaPage(
+  page: any,
+  query: string,
+  context?: string
+): number {
+  let score = 50 - (page.index ?? 10) * 4;
+
+  const normTitle = cleanAlphanumeric(page.title || '');
+  const normQ = cleanAlphanumeric(query);
+
+  // Exact match bonus (e.g. "Shock wave" matching "shockwave")
+  if (normTitle === normQ) {
+    score += 75;
+  } else if (normTitle.startsWith(normQ) || normTitle.endsWith(normQ)) {
+    score += 40;
+  } else if (normTitle.includes(normQ) || normQ.includes(normTitle)) {
+    score += 25;
+  }
+
+  const extract = (page.extract || '').toLowerCase();
+  const title = (page.title || '').toLowerCase();
+  const imgUrl = (page.thumbnail?.source || '').toLowerCase();
+  const fullContext = `${context || ''} ${query}`.toLowerCase();
+
+  // Detect if the user topic or query is scientific, natural, anatomical, or physical
+  const isScienceOrNature =
+    /\b(physics|biology|mechanics|acoustic|nature|science|cavitating|marine|cell|geology|chemistry|impact|shock|wave|quantum|astro|plant|space|crystal|enzyme|animal|species|organ|tissue|fiber|shrimp|mantis|molecular|armor|fracture|stress)\b/i.test(
+      fullContext
+    );
+
+  // Heavy penalty for software, video games, vehicles, brand logos, comics, music in science contexts
+  const isSoftwareOrMedia =
+    /\b(software|multimedia|video game|plug-in|arcade|album|single|fictional character|comic book|band|song|franchise|mascot|web browser|operating system|truck|tractor|race car|toy|merchandise)\b/i.test(
+      extract + ' ' + title
+    );
+
+  if (isScienceOrNature && isSoftwareOrMedia) {
+    score -= 90;
+  }
+
+  // Heavy penalty for illicit drugs / narcotics in science/engineering contexts
+  const isNarcotics =
+    /\b(cocaine|narcotic|illicit drug|controlled substance|recreational drug|hallucinogen|high on)\b/i.test(
+      extract + ' ' + title
+    );
+
+  if (isScienceOrNature && isNarcotics) {
+    score -= 100;
+  }
+
+  // Penalize vector logos, crests, and branding images in encyclopedic lookups
+  if (
+    imgUrl.includes('.svg') ||
+    imgUrl.includes('logo') ||
+    imgUrl.includes('icon') ||
+    imgUrl.includes('crest') ||
+    title.includes('logo')
+  ) {
+    score -= 40;
+  }
+
+  // Bonus for scientific or natural domain resonance
+  if (
+    isScienceOrNature &&
+    /\b(mechanics|acoustics|physics|propagation|disturbance|sound|pressure|acoustic|energy|medium|velocity|supersonic|mach|density|temperature|fluid|gas|material|biology|anatomical|organism|crystall|mineral|fracture|engineering|structural)\b/i.test(
+      extract
+    )
+  ) {
+    score += 50;
+  }
+
+  return score;
 }
 
 async function searchDuckDuckGoFast(
@@ -142,7 +232,7 @@ async function searchWikipedia(
 ): Promise<{ title: string; imageUrl: string; sourceUrl: string; extract?: string } | null> {
   const searchUrl = `https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(
     searchTerm
-  )}&gsrlimit=6&prop=pageimages|extracts&pithumbsize=600&pilimit=6&exintro=1&explaintext=1&redirects=1&format=json&origin=*`;
+  )}&gsrlimit=8&prop=pageimages|extracts&pithumbsize=600&pilimit=8&exintro=1&explaintext=1&redirects=1&format=json&origin=*`;
 
   try {
     const res = await fetch(searchUrl, {
@@ -151,27 +241,30 @@ async function searchWikipedia(
 
     if (!res.ok) return null;
     const data = await res.json();
-    const pages = Object.values(data.query?.pages || {}) as any[];
+    const rawPages = (Object.values(data.query?.pages || {}) as any[]).sort(
+      (a, b) => (a.index ?? 999) - (b.index ?? 999)
+    );
 
     // 1. Filter out pages without thumbnails or matching excludeUrl
-    const validPages = pages.filter((p) => {
+    const validPages = rawPages.filter((p) => {
       const thumb = p.thumbnail?.source;
       return thumb && !isExcluded(thumb);
     });
 
     if (validPages.length === 0) return null;
 
-    // 2. Filter strictly for relevant pages that actually match the query or context
-    const relevantPages = validPages.filter((p) =>
-      isRelevantWikipediaPage(p.title || '', searchTerm, context)
-    );
+    // 2. Score pages and discard negative scores (like Adobe Shockwave or Genshin Impact)
+    const scoredPages = validPages
+      .filter((p) => isRelevantWikipediaPage(p.title || '', searchTerm, context, p.extract))
+      .map((p) => ({ page: p, score: scoreWikipediaPage(p, searchTerm, context) }))
+      .filter((item) => item.score > 0)
+      .sort((a, b) => b.score - a.score);
 
-    // If none of the returned pages match the query (e.g. Wikipedia returned Ben Kingsley for Mohanlal), reject!
-    if (relevantPages.length === 0) {
+    if (scoredPages.length === 0) {
       return null;
     }
 
-    const targetPage = relevantPages[occurrence] || relevantPages[0];
+    const targetPage = scoredPages[occurrence]?.page || scoredPages[0].page;
     if (targetPage && targetPage.thumbnail?.source) {
       const title = targetPage.title || searchTerm;
       return {
@@ -189,11 +282,12 @@ async function searchWikipedia(
 
 async function searchCommons(
   searchTerm: string,
-  isExcluded: (url: string | null | undefined) => boolean
+  isExcluded: (url: string | null | undefined) => boolean,
+  context?: string
 ): Promise<{ title: string; imageUrl: string; sourceUrl: string } | null> {
   const commonsUrl = `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(
-    searchTerm + ' -filetype:pdf -icon'
-  )}&gsrnamespace=6&gsrlimit=4&prop=imageinfo&iiprop=url&iiurlwidth=600&format=json&origin=*`;
+    searchTerm + ' -filetype:pdf -icon -filetype:webm -filetype:ogv -filetype:mp4'
+  )}&gsrnamespace=6&gsrlimit=6&prop=imageinfo&iiprop=url&iiurlwidth=600&format=json&origin=*`;
 
   try {
     const res = await fetch(commonsUrl, {
@@ -207,20 +301,26 @@ async function searchCommons(
       const info = cp.imageinfo?.[0];
       const url = info?.thumburl || info?.url;
       const lower = (cp.title || '').toLowerCase();
+      const rawTitle = (cp.title || '').replace(/^File:/i, '');
+
       if (
-        url &&
-        !lower.includes('.pdf') &&
-        !lower.includes('.svg') &&
-        !lower.includes('logo') &&
-        !isExcluded(url)
+        !url ||
+        isExcluded(url) ||
+        /\.(pdf|svg|webm|ogv|mp4|mov|ogg)$|\b(logo|icon|cocaine|smoking)\b/i.test(lower)
       ) {
-        const title = (cp.title || searchTerm).replace(/^File:/i, '');
-        return {
-          title,
-          imageUrl: url,
-          sourceUrl: `https://commons.wikimedia.org/wiki/${encodeURIComponent((cp.title || searchTerm).replace(/\s+/g, '_'))}`,
-        };
+        continue;
       }
+
+      // Check if image title is actually relevant to the topic
+      if (!isRelevantWikipediaPage(rawTitle, searchTerm, context)) {
+        continue;
+      }
+
+      return {
+        title: rawTitle,
+        imageUrl: url,
+        sourceUrl: `https://commons.wikimedia.org/wiki/${encodeURIComponent((cp.title || searchTerm).replace(/\s+/g, '_'))}`,
+      };
     }
   } catch {
     // Network error
@@ -380,9 +480,9 @@ export async function GET(request: NextRequest) {
 
     // ROUTE C: Wikimedia Commons (For scientific/diagrammatic subjects)
     if (!rawImageUrl) {
-      let commonsResult = await searchCommons(enrichedQuery, isExcluded);
+      let commonsResult = await searchCommons(enrichedQuery, isExcluded, isContextValid ? context : undefined);
       if (!commonsResult && enrichedQuery !== sanitizedQuery) {
-        commonsResult = await searchCommons(sanitizedQuery, isExcluded);
+        commonsResult = await searchCommons(sanitizedQuery, isExcluded, isContextValid ? context : undefined);
       }
 
       if (commonsResult) {

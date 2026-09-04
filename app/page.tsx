@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Sliders,
@@ -190,10 +190,12 @@ export default function PlaygroundPage() {
 
       while (true) {
         const { done, value } = await reader.read();
-        if (done) break;
+        if (done || abortControllerRef.current !== controller) break;
         const chunk = decoder.decode(value, { stream: true });
         accumulated += chunk;
-        setStreamedText(accumulated);
+        if (abortControllerRef.current === controller) {
+          setStreamedText(accumulated);
+        }
       }
     } catch (err: unknown) {
       if (err instanceof Error && err.name === 'AbortError') {
@@ -201,16 +203,20 @@ export default function PlaygroundPage() {
       }
       const msg = err instanceof Error ? err.message : 'Streaming error occurred';
       console.error('[Gemini Stream Error]:', msg);
-      setApiError(msg);
+      if (abortControllerRef.current === controller) {
+        setApiError(msg);
+      }
     } finally {
-      setIsLiveGenerating(false);
-      setIsStreaming(false);
+      if (abortControllerRef.current === controller) {
+        setIsLiveGenerating(false);
+        setIsStreaming(false);
+      }
     }
   };
 
   // Shuffle button handler: queries Gemini LLM to invent an unpredictable, non-repeating scientific mystery
   const handleShuffle = async () => {
-    if (isShuffling) return;
+    if (isShuffling || isStreaming || isLiveGenerating) return;
     setIsShuffling(true);
 
     try {
@@ -292,6 +298,7 @@ export default function PlaygroundPage() {
           : `In the scientific study of **${queryText}** ${createNeanderthalMediaMarkdown(queryText)}, researchers analyze its biochemical, physical, and ecological significance in the natural world.`,
       };
       setSelectedPreset(newCustomPreset);
+      startStreaming(newCustomPreset.response);
     }
   };
 
@@ -333,10 +340,17 @@ export default function PlaygroundPage() {
     return candidate;
   }, [selectedPreset.title, selectedPreset.prompt]);
 
-  // Proactively pre-resolve media tokens in parallel as they stream in
+  const preResolvedQueriesRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    preResolvedQueriesRef.current.clear();
+  }, [selectedPreset.id]);
+
+  // Proactively pre-resolve media tokens in parallel as they stream in (once per distinct query)
   useEffect(() => {
     for (const token of mediaTokens) {
-      if (token.query && !token.isPartial) {
+      if (token.query && !token.isPartial && !preResolvedQueriesRef.current.has(token.query)) {
+        preResolvedQueriesRef.current.add(token.query);
         resolveMedia(
           token.query,
           token.fallbackUrl,
@@ -366,12 +380,18 @@ export default function PlaygroundPage() {
     setInspectMedia(resolved);
   };
 
+  const handleCloseLightbox = useCallback(() => {
+    setInspectMedia(null);
+  }, []);
+
+  const isBusy = isShuffling || isStreaming || isLiveGenerating;
+
   return (
-    <div className="min-h-screen bg-[#090a0d] text-[#e5e7eb] flex flex-col justify-center items-center p-3 sm:p-4 md:p-6 selection:bg-amber-500/20 selection:text-amber-300">
-      <div className="w-full max-w-[900px] flex flex-col gap-3">
+    <div className="min-h-screen bg-[#090a0c] text-[#fafafa] flex flex-col justify-center items-center p-3 sm:p-5 md:p-8 selection:bg-white/20 selection:text-white">
+      <div className="w-full max-w-[960px] flex flex-col gap-4">
         {/* Preset & Control Action Bar */}
-        <section className="flex items-center justify-between gap-2 overflow-x-auto pb-1 scrollbar-none">
-          <div className="flex items-center gap-1.5 shrink-0">
+        <section className="flex items-center justify-between gap-3 overflow-x-auto pb-1 scrollbar-none">
+          <div className="flex items-center gap-2 shrink-0">
             {/* Presets List */}
             {PRESETS.map((preset) => {
               const isSelected = selectedPreset.id === preset.id;
@@ -386,10 +406,10 @@ export default function PlaygroundPage() {
                       startStreaming(preset.response);
                     }
                   }}
-                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all shrink-0 border ${
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all shrink-0 border active:scale-[0.96] ${
                     isSelected
-                      ? 'bg-amber-500/15 border-amber-500/40 text-amber-300 shadow-sm'
-                      : 'bg-white/5 border-white/10 text-zinc-400 hover:bg-white/10 hover:text-white'
+                      ? 'bg-white text-zinc-950 border-white shadow-sm font-semibold'
+                      : 'bg-white/[0.04] border-white/[0.08] text-zinc-400 hover:bg-white/[0.08] hover:text-zinc-200'
                   }`}
                 >
                   <span>{preset.icon}</span>
@@ -404,20 +424,20 @@ export default function PlaygroundPage() {
             <button
               type="button"
               onClick={() => setShowKeyModal(true)}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all border ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border active:scale-[0.96] ${
                 apiKey
-                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20'
-                  : 'bg-white/5 border-white/10 text-zinc-400 hover:bg-white/10 hover:text-white'
+                  ? 'bg-white/[0.08] border-white/20 text-zinc-200 hover:bg-white/[0.12]'
+                  : 'bg-white/[0.04] border-white/[0.08] text-zinc-400 hover:bg-white/[0.08] hover:text-zinc-200'
               }`}
               title={apiKey ? 'Gemini API Key Connected' : 'Add Gemini API Key for live unscripted answers'}
             >
-              <Key className="w-3 h-3 text-amber-400" />
+              <Key className="w-3.5 h-3.5 text-zinc-300" />
               <span className="hidden sm:inline">
                 {apiKey ? getModelShortLabel(selectedModel) : 'Add Key'}
               </span>
               <span
                 className={`w-1.5 h-1.5 rounded-full ${
-                  apiKey ? 'bg-emerald-400' : 'bg-zinc-500'
+                  apiKey ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.5)]' : 'bg-zinc-600'
                 }`}
               />
             </button>
@@ -425,17 +445,17 @@ export default function PlaygroundPage() {
         </section>
 
         {/* Two-Column Layout: Left (Chat) + Right (Control Property) */}
-        <div className="grid grid-cols-1 md:grid-cols-[1fr_280px] gap-3.5 items-start w-full">
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_290px] gap-4 items-start w-full">
           {/* Left Column: Chat & Live Streaming */}
-          <main className="flex flex-col gap-3 min-w-0">
+          <main className="flex flex-col gap-3.5 min-w-0">
 
           {/* Chat Stream Card */}
-          <div className="rounded-2xl bg-[#111317] border border-white/10 shadow-2xl flex flex-col overflow-hidden">
+          <div className="rounded-2xl bg-[#101114] border border-white/[0.08] shadow-2xl flex flex-col overflow-hidden">
             {/* Question Bar */}
-            <div className="px-4 py-3 border-b border-white/10 bg-[#14161b] flex items-center justify-between gap-3">
+            <div className="px-5 py-3.5 border-b border-white/[0.08] bg-[#14151a] flex items-center justify-between gap-3.5">
               <div className="flex items-center gap-2.5 min-w-0">
                 <span className="text-lg shrink-0">{selectedPreset.icon}</span>
-                <p className="text-sm font-semibold text-white tracking-tight truncate min-w-0">
+                <p className="text-[13.5px] font-medium text-zinc-100 tracking-tight truncate min-w-0">
                   {selectedPreset.prompt}
                 </p>
               </div>
@@ -444,30 +464,30 @@ export default function PlaygroundPage() {
               <button
                 type="button"
                 onClick={handleShuffle}
-                disabled={isShuffling}
-                className={`group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-white/5 border border-white/10 text-zinc-300 hover:text-amber-300 hover:border-amber-400/40 hover:bg-white/10 active:scale-95 transition-all shrink-0 shadow-sm ${
-                  isShuffling ? 'opacity-70 cursor-wait' : ''
+                disabled={isBusy}
+                className={`group relative overflow-hidden flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all shrink-0 shadow-sm ${
+                  isBusy
+                    ? 'border-white/20 text-zinc-400 cursor-not-allowed animate-shimmer'
+                    : 'bg-white/[0.04] border-white/[0.08] text-zinc-300 hover:text-white hover:border-white/20 hover:bg-white/[0.08] active:scale-[0.96]'
                 }`}
-                title="Shuffle to random AI-generated Nature & Science prompt"
+                title={isBusy ? 'Generating response...' : 'Shuffle to random AI-generated Nature & Science prompt'}
               >
                 <Shuffle
                   className={`w-3.5 h-3.5 transition-all duration-300 ${
-                    isShuffling
-                      ? 'animate-spin text-amber-400'
-                      : 'text-zinc-400 group-hover:text-amber-400 group-hover:rotate-180'
+                    isBusy ? 'text-zinc-400' : 'text-zinc-400 group-hover:text-white group-hover:rotate-180'
                   }`}
                 />
-                <span>{isShuffling ? 'Inventing...' : 'Shuffle'}</span>
+                <span>{isShuffling ? 'Inventing...' : isStreaming ? 'Streaming...' : 'Shuffle'}</span>
               </button>
             </div>
 
             {/* Stream View Area */}
             <div
               ref={streamContainerRef}
-              className="p-4 md:p-5 overflow-y-auto h-[420px] text-[13.5px] leading-relaxed"
+              className="p-6 sm:p-7 md:p-8 overflow-y-auto h-[480px] sm:h-[520px] text-[15px] leading-[1.8]"
             >
               {apiError && (
-                <div className="p-3 mb-3 rounded-xl bg-red-500/10 border border-red-500/30 flex items-start justify-between gap-3 text-xs text-red-300">
+                <div className="p-3.5 mb-4 rounded-xl bg-red-500/10 border border-red-500/30 flex items-start justify-between gap-3 text-xs text-red-300">
                   <div className="flex items-start gap-2 min-w-0">
                     <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
                     <div className="min-w-0">
@@ -486,8 +506,8 @@ export default function PlaygroundPage() {
               )}
 
               {isLiveGenerating && !streamedText && (
-                <div className="flex items-center gap-2.5 text-xs text-zinc-400 py-8 justify-center animate-pulse">
-                  <Sparkles className="w-4 h-4 text-amber-400 animate-spin" />
+                <div className="flex items-center gap-2.5 text-xs text-zinc-400 py-12 justify-center animate-pulse">
+                  <Sparkles className="w-4 h-4 text-zinc-300 animate-spin" />
                   <span>
                     {getModelFullLabel(selectedModel)} is
                     generating insights with visual capsules...
@@ -496,11 +516,12 @@ export default function PlaygroundPage() {
               )}
 
               <StreamingMarkdownView
+                key={selectedPreset.id}
                 content={streamedText}
                 context={activeEntityContext}
                 isStreaming={isStreaming}
                 settings={capsuleSettings}
-                onInspect={(m) => setInspectMedia(m)}
+                onInspect={setInspectMedia}
               />
             </div>
           </div>
@@ -513,55 +534,55 @@ export default function PlaygroundPage() {
                 value={customInput}
                 onChange={(e) => setCustomInput(e.target.value)}
                 placeholder="Ask anything about science, nature, cosmos..."
-                className="w-full bg-[#111317] border border-white/10 focus:border-amber-400/50 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-amber-400/50 shadow-md pr-10 transition-all"
+                className="w-full bg-[#101114] border border-white/[0.08] focus:border-white/25 focus:ring-1 focus:ring-white/20 rounded-xl pl-4 pr-12 py-3 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none shadow-md transition-all"
               />
               <button
                 type="submit"
-                className="absolute right-1.5 p-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-semibold transition-colors"
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 h-8 w-8 rounded-lg bg-white hover:bg-zinc-200 text-black font-semibold transition-all shadow-sm active:scale-[0.96] flex items-center justify-center"
                 title="Send query"
               >
-                <Send className="w-3.5 h-3.5" />
+                <Send className="w-3.5 h-3.5 text-black" />
               </button>
             </div>
           </form>
         </main>
 
         {/* Right Column: Control Property Sidebar */}
-        <aside className="w-full md:w-[280px] shrink-0 flex flex-col gap-3">
-          <div className="rounded-2xl bg-[#111317] border border-white/10 shadow-xl overflow-hidden flex flex-col">
+        <aside className="w-full md:w-[290px] shrink-0 flex flex-col gap-3.5">
+          <div className="rounded-2xl bg-[#101114] border border-white/[0.08] shadow-xl overflow-hidden flex flex-col">
             {/* Tabs */}
-            <div className="flex items-center border-b border-white/10 bg-[#14161b]">
+            <div className="flex items-center border-b border-white/[0.08] bg-[#14151a] h-11">
               <button
                 type="button"
                 onClick={() => setActiveTab('design')}
-                className={`flex-1 py-2.5 px-2 text-[11px] font-semibold flex items-center justify-center gap-1 transition-colors border-b-2 ${
+                className={`flex-1 h-full px-3 text-xs font-medium flex items-center justify-center gap-1.5 transition-colors border-b-2 active:scale-[0.98] ${
                   activeTab === 'design'
-                    ? 'border-amber-400 text-amber-300 bg-white/5'
-                    : 'border-transparent text-zinc-400 hover:text-zinc-200'
+                    ? 'border-white text-white bg-white/[0.03]'
+                    : 'border-transparent text-zinc-500 hover:text-zinc-300'
                 }`}
               >
-                <Sliders className="w-3 h-3" />
+                <Sliders className="w-3.5 h-3.5" />
                 Craft
               </button>
               <button
                 type="button"
                 onClick={() => setActiveTab('media')}
-                className={`flex-1 py-2.5 px-2 text-[11px] font-semibold flex items-center justify-center gap-1 transition-colors border-b-2 ${
+                className={`flex-1 h-full px-3 text-xs font-medium flex items-center justify-center gap-1.5 transition-colors border-b-2 active:scale-[0.98] ${
                   activeTab === 'media'
-                    ? 'border-amber-400 text-amber-300 bg-white/5'
-                    : 'border-transparent text-zinc-400 hover:text-zinc-200'
+                    ? 'border-white text-white bg-white/[0.03]'
+                    : 'border-transparent text-zinc-500 hover:text-zinc-300'
                 }`}
               >
-                <ImageIcon className="w-3 h-3" />
+                <ImageIcon className="w-3.5 h-3.5" />
                 Media ({mediaTokens.length})
               </button>
             </div>
 
             {/* Tab Contents */}
-            <div className="p-5 overflow-y-auto max-h-[calc(100vh-220px)] space-y-5 text-xs">
+            <div className="p-5 overflow-y-auto max-h-[calc(100vh-220px)] space-y-6 text-xs">
               {/* Tab 1: Design Controls */}
               {activeTab === 'design' && (
-                <div className="space-y-4">
+                <div className="space-y-5">
                   {[
                     {
                       label: 'Capsule Height',
@@ -608,9 +629,9 @@ export default function PlaygroundPage() {
                     },
                   ].map((ctrl) => (
                     <div key={ctrl.key}>
-                      <div className="flex justify-between mb-1.5">
+                      <div className="flex items-center justify-between mb-2">
                         <span className="font-medium text-zinc-300">{ctrl.label}</span>
-                        <span className="font-mono text-amber-400">{ctrl.value ?? ctrl.min}{ctrl.unit}</span>
+                        <span className="font-mono text-xs text-white font-semibold">{ctrl.value ?? ctrl.min}{ctrl.unit}</span>
                       </div>
                       <input
                         type="range"
@@ -623,9 +644,9 @@ export default function PlaygroundPage() {
                             [ctrl.key]: Number(e.target.value),
                           }))
                         }
-                        className="w-full accent-amber-400 cursor-pointer"
+                        className="w-full cursor-pointer"
                       />
-                      {ctrl.hint && <span className="text-[11px] text-zinc-500">{ctrl.hint}</span>}
+                      {ctrl.hint && <span className="text-[11px] text-zinc-500 mt-1.5 block leading-normal">{ctrl.hint}</span>}
                     </div>
                   ))}
 
@@ -633,7 +654,7 @@ export default function PlaygroundPage() {
                     <button
                       type="button"
                       onClick={() => setCapsuleSettings({ ...DEFAULT_CAPSULE_SETTINGS })}
-                      className="w-full py-2 rounded-lg bg-white/5 hover:bg-white/10 text-zinc-300 font-medium transition-colors border border-white/10 text-xs"
+                      className="w-full py-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-zinc-300 hover:text-white font-medium transition-all border border-white/[0.08] text-xs active:scale-[0.96]"
                     >
                       Reset to Craft Defaults
                     </button>
@@ -643,8 +664,8 @@ export default function PlaygroundPage() {
 
               {/* Tab 2: Media Pool */}
               {activeTab === 'media' && (
-                <div className="space-y-3">
-                  <p className="text-zinc-400 text-[11px]">
+                <div className="space-y-3.5">
+                  <p className="text-zinc-400 text-[11px] leading-relaxed">
                     All media entities recognized in current streaming response:
                   </p>
                   <div className="space-y-2">
@@ -658,27 +679,21 @@ export default function PlaygroundPage() {
                             token.vendorPreference
                           )
                         }
-                        className="p-2.5 rounded-lg bg-black/40 border border-white/10 hover:border-amber-400/40 cursor-pointer flex items-center justify-between transition-all group"
+                        className="p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.08] hover:border-white/20 hover:bg-white/[0.05] cursor-pointer flex items-center justify-between transition-all group active:scale-[0.98]"
                       >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="w-5 h-5 rounded-md bg-amber-500/20 text-amber-400 flex items-center justify-center text-[10px] font-bold">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span className="w-5 h-5 rounded-md bg-white/10 text-zinc-200 flex items-center justify-center text-[10px] font-mono font-semibold">
                             {idx + 1}
                           </span>
-                          <span className="font-medium text-white truncate max-w-[150px]">
+                          <span className="font-medium text-zinc-200 group-hover:text-white truncate max-w-[145px]">
                             {token.query}
                           </span>
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0">
-                          <span
-                            className={`text-[9px] font-mono uppercase px-1.5 py-0.5 rounded border ${
-                              token.vendorPreference === 'duckduckgo'
-                                ? 'bg-sky-500/15 text-sky-300 border-sky-500/30'
-                                : 'bg-amber-500/15 text-amber-300 border-amber-500/20'
-                            }`}
-                          >
+                          <span className="text-[9px] font-mono uppercase px-1.5 py-0.5 rounded border border-white/10 bg-white/[0.04] text-zinc-400 font-medium">
                             {token.vendorPreference === 'duckduckgo' ? 'DDG' : 'Wiki'}
                           </span>
-                          <ChevronRight className="w-4 h-4 text-zinc-500 group-hover:text-amber-400 transition-colors" />
+                          <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-zinc-300 transition-colors" />
                         </div>
                       </div>
                     ))}
@@ -699,11 +714,11 @@ export default function PlaygroundPage() {
               initial={{ opacity: 0, scale: 0.95, y: 8 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 6 }}
-              className="w-full max-w-md p-6 rounded-2xl bg-[#14161b] border border-white/15 shadow-2xl space-y-4 text-left"
+              className="w-full max-w-md p-6 rounded-2xl bg-[#131418] border border-white/15 shadow-2xl space-y-4 text-left"
             >
               <div className="flex items-center justify-between pb-2 border-b border-white/10">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                  <div className="w-8 h-8 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-zinc-200">
                     <Key className="w-4 h-4" />
                   </div>
                   <div>
@@ -729,7 +744,7 @@ export default function PlaygroundPage() {
                   value={keyDraft}
                   onChange={(e) => setKeyDraft(e.target.value)}
                   placeholder="AIzaSy..."
-                  className="w-full bg-black/50 border border-white/15 focus:border-amber-400/60 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-zinc-600 focus:outline-none focus:ring-1 focus:ring-amber-400/50 font-mono transition-all"
+                  className="w-full bg-black/50 border border-white/15 focus:border-white/30 focus:ring-1 focus:ring-white/20 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-zinc-600 focus:outline-none font-mono transition-all"
                 />
                 <p className="text-[11px] text-zinc-500">
                   Your key is saved locally in your browser&apos;s localStorage and sent securely to your local dev server.
@@ -749,7 +764,7 @@ export default function PlaygroundPage() {
                       localStorage.setItem('neanderthal_gemini_model', newModel);
                     }
                   }}
-                  className="w-full bg-black/50 border border-white/15 focus:border-amber-400/60 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-amber-400/50 transition-all cursor-pointer"
+                  className="w-full bg-black/50 border border-white/15 focus:border-white/30 focus:ring-1 focus:ring-white/20 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none transition-all cursor-pointer"
                 >
                   <option value="gemini-3.8-flash">Gemini 3.8 Flash (Latest Flagship)</option>
                   <option value="gemini-3.6-flash">Gemini 3.6 Flash</option>
@@ -767,7 +782,7 @@ export default function PlaygroundPage() {
                   href="https://aistudio.google.com/app/apikey"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-amber-400 hover:text-amber-300 font-medium transition-colors text-[11px]"
+                  className="inline-flex items-center gap-1 text-zinc-300 hover:text-white underline decoration-zinc-600 font-medium transition-colors text-[11px]"
                 >
                   Get a free key from Google AI Studio
                   <ExternalLink className="w-3 h-3" />
@@ -778,7 +793,7 @@ export default function PlaygroundPage() {
                     <button
                       type="button"
                       onClick={handleClearKey}
-                      className="px-3 py-1.5 rounded-lg border border-red-500/30 text-red-400 hover:bg-red-500/10 font-medium transition-colors"
+                      className="px-3 py-1.5 rounded-lg border border-red-500/30 text-red-400 hover:bg-red-500/10 font-medium transition-colors active:scale-[0.96]"
                     >
                       Clear
                     </button>
@@ -786,7 +801,7 @@ export default function PlaygroundPage() {
                   <button
                     type="button"
                     onClick={handleSaveKey}
-                    className="px-4 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-semibold transition-colors shadow-sm"
+                    className="px-4 py-1.5 rounded-lg bg-white hover:bg-zinc-200 text-black font-semibold transition-all shadow-sm active:scale-[0.96]"
                   >
                     Save Key
                   </button>
@@ -798,7 +813,7 @@ export default function PlaygroundPage() {
       </AnimatePresence>
 
       {/* Lightbox Inspection Modal */}
-      <MediaLightbox media={inspectMedia} onClose={() => setInspectMedia(null)} />
+      <MediaLightbox media={inspectMedia} onClose={handleCloseLightbox} />
     </div>
   );
 }

@@ -12,6 +12,10 @@ const proxyMemoryCache = new Map<string, CachedImage>();
 const MAX_PROXY_CACHE = 300;
 const CACHE_TTL_MS = 1000 * 60 * 60 * 24; // 24 hours
 
+const USER_AGENT =
+  process.env.USER_AGENT ||
+  'NeanderthalApp/1.0 (https://github.com/asiffisa/Neanderthal; contact@example.com)';
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const imageUrl = searchParams.get('url');
@@ -36,7 +40,7 @@ export async function GET(request: NextRequest) {
   try {
     const isWikimedia = imageUrl.includes('wikipedia.org') || imageUrl.includes('wikimedia.org');
     const headers: Record<string, string> = {
-      'User-Agent': 'NeanderthalApp/1.0 (https://github.com/asif/neanderthal; contact@neanderthal-demo.com)',
+      'User-Agent': USER_AGENT,
       'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
     };
     if (isWikimedia) {
