@@ -32,9 +32,9 @@ Take a sentence:
 
 > Neanderthals shaped Mousterian stone tools to produce sharp cutting flakes.
 
-> Neanderthals ![Neanderthal](neanderthal:image?provider=wikipedia&fallback=https%3A%2F%2Fupload.wikimedia.org%2Fwikipedia%2Fcommons%2F3%2F3c%2FNeanderthal_at_AMNH.jpg) shaped Mousterian stone tools ![Mousterian stone tools](neanderthal:image?provider=wikipedia&fallback=https%3A%2F%2Fupload.wikimedia.org%2Fwikipedia%2Fcommons%2F1%2F13%2FPointe_Moust%25C3%25A9rienne_MHNT_PRE_2009.0.205.4_De_Maret.jpg) to produce sharp cutting flakes.
-
 If you've never seen a Mousterian tool, that name gives you nothing to hold on to. You either take the sentence on trust or leave the page to go find out.
+
+> Neanderthals ![Neanderthal](neanderthal:image?provider=wikipedia&fallback=https%3A%2F%2Fupload.wikimedia.org%2Fwikipedia%2Fcommons%2F3%2F3c%2FNeanderthal_at_AMNH.jpg) shaped Mousterian stone tools ![Mousterian stone tools](neanderthal:image?provider=wikipedia&fallback=https%3A%2F%2Fupload.wikimedia.org%2Fwikipedia%2Fcommons%2F1%2F1a%2FProduction_of_points_%2526_spearheads_from_a_flint_stone_core%252C_Levallois_technique%252C_Mousterian_Culture%252C_Tabun_Cave%252C_250%252C000-50%252C000_BP_%2528detail%2529.jpg) to produce sharp cutting flakes.
 
 It isn't an emoji and it isn't decoration. It's a piece of visual evidence, small while you read, open when you are curious.
 

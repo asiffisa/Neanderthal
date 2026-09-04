@@ -92,6 +92,16 @@ export async function resolveMedia(
   pending.consumers++;
   try {
     const media = await (signal ? abortable(pending.promise, signal) : pending.promise);
+    const fallbackImage = imageUrl(fallbackUrl);
+    if (fallbackImage) {
+      return {
+        ...media,
+        query,
+        thumbnailUrl: fallbackImage,
+        fullImageUrl: fallbackImage,
+        status: 'loaded',
+      };
+    }
     return media.thumbnailUrl ? { ...media, query } : mediaFallback(query, fallbackUrl);
   } finally {
     pending.consumers--;
