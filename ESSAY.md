@@ -20,9 +20,9 @@ Then pictures learned to speak. For most of writing's history, images weren't pl
 
 They weren't alone.
 
-- **Cuneiform** started around 3300 BCE in Uruk as simplified drawings of real things, grain and cattle and tools, before speed and the stylus flattened them into abstract wedges.
-- **Aztec and Mixtec codices** were painted, not spelled. The images carried the story and the glyphs supplied names, places, and dates.
-- **Naxi Dongba** in southwestern China is the last picture writing still in use, held by a few dozen elderly priests. You can still see pictographic script roadsigns in that part of China.
+- ![Cuneiform](neanderthal:image?provider=wikipedia&fallback=https%3A%2F%2Fupload.wikimedia.org%2Fwikipedia%2Fcommons%2Fe%2Fe1%2FXerxes_Cuneiform_Van.JPG) **Cuneiform** started around 3300 BCE in Uruk as simplified drawings of real things, grain and cattle and tools, before speed and the stylus flattened them into abstract wedges.
+- ![Aztec codices](neanderthal:image?provider=wikipedia&fallback=https%3A%2F%2Fupload.wikimedia.org%2Fwikipedia%2Fcommons%2Fa%2Faa%2FCodexMendoza01.jpg) **Aztec and Mixtec codices** were painted, not spelled. The images carried the story and the glyphs supplied names, places, and dates.
+- ![Naxi Dongba](neanderthal:image?provider=wikipedia&fallback=https%3A%2F%2Fupload.wikimedia.org%2Fwikipedia%2Fcommons%2F6%2F6a%2FPainted_Naxi_panel.jpeg) **Naxi Dongba** in southwestern China is the last picture writing still in use, held by a few dozen elderly priests. You can still see pictographic script roadsigns in that part of China.
 
 Across continents that never met, scribes landed on the same instinct. A picture can do work inside a sentence that a word can't do as well.
 
