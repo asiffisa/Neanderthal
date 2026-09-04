@@ -493,7 +493,7 @@ export default function Playground({ hasInitialServerKey = false }: PlaygroundPr
                   className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7 rounded-lg bg-white hover:bg-zinc-200 text-black font-semibold transition-all shadow-sm active:scale-[0.96] flex items-center justify-center"
                   title="Send query"
                 >
-                  <Send className="w-3.5 h-3.5 text-black translate-x-[0.5px] -translate-y-[0.5px]" />
+                  <Send className="w-3.5 h-3.5 text-black -translate-x-[1px]" />
                 </button>
               )}
             </div>
