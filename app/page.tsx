@@ -1,9 +1,8 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import Image from 'next/image';
-import Markdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import Playground from './Playground';
+import { EssayMarkdown } from '../src/components/EssayMarkdown';
 import styles from './essay.module.css';
 
 const playgroundHeading = 'Put the picture where the meaning happens';
@@ -34,18 +33,18 @@ function PictographicScriptSection({ markdown }: { markdown: string }) {
   return (
     <div className={styles.prose}>
       {blocks.map((block, index) => {
-        const panel = pictographicPanels.find(({ marker }) => block.startsWith(marker));
+        const panel = pictographicPanels.find(({ marker }) => block.includes(marker));
 
         if (!panel) {
           if (block === pictographicTransition) {
             return (
               <div key={pictographicTransition} className={styles.scriptTransition}>
-                <Markdown remarkPlugins={[remarkGfm]}>{block}</Markdown>
+                <EssayMarkdown>{block}</EssayMarkdown>
               </div>
             );
           }
 
-          return <Markdown key={`${index}-${block.slice(0, 24)}`} remarkPlugins={[remarkGfm]}>{block}</Markdown>;
+          return <EssayMarkdown key={`${index}-${block.slice(0, 24)}`}>{block}</EssayMarkdown>;
         }
 
         return (
@@ -54,7 +53,7 @@ function PictographicScriptSection({ markdown }: { markdown: string }) {
             className={`${styles.scriptPair} ${panel.reverse ? styles.scriptPairReverse : ''}`}
           >
             <div className={styles.scriptCopy}>
-              <Markdown remarkPlugins={[remarkGfm]}>{block}</Markdown>
+              <EssayMarkdown>{block}</EssayMarkdown>
             </div>
             <figure className={styles.scriptFigure}>
               <Image src={panel.image} alt={panel.alt} width={panel.width} height={panel.height} sizes="(max-width: 760px) 100vw, 320px" />
@@ -99,7 +98,7 @@ export default async function EssayPage() {
                     <PictographicScriptSection markdown={section} />
                   ) : (
                     <div className={styles.prose}>
-                      <Markdown remarkPlugins={[remarkGfm]}>{section}</Markdown>
+                      <EssayMarkdown>{section}</EssayMarkdown>
                     </div>
                   )}
                   {heading === playgroundHeading && (
