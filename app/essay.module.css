@@ -70,6 +70,7 @@
   color: #f4f4f5;
   font-size: clamp(17px, 1.6vw, 19px);
   line-height: 1.6;
+  font-style: italic;
 }
 
 .prose :is(ul, ol) {
