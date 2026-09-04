@@ -82,7 +82,7 @@ export default async function EssayPage() {
                 alt="Lascaux cave paintings in Dordogne, France"
                 width={1600}
                 height={440}
-                sizes="(max-width: 1024px) calc(100vw - 40px), 960px"
+                sizes="(max-width: 864px) calc(100vw - 40px), 800px"
                 priority
               />
             </figure>

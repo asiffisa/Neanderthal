@@ -361,7 +361,7 @@ export default function Playground({ hasInitialServerKey = false }: PlaygroundPr
 
   return (
     <div className="w-full min-w-0 text-[#fafafa] selection:bg-white/20 selection:text-white">
-      <div className="w-full max-w-[960px] flex flex-col gap-4">
+      <div className="w-full max-w-[800px] flex flex-col gap-4">
         {/* Preset & Control Action Bar */}
         <section className="flex items-center justify-between gap-3 overflow-x-auto pb-1 scrollbar-none">
           <div className="flex items-center gap-2 shrink-0">
