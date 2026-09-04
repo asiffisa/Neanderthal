@@ -41,6 +41,8 @@ function getModelFullLabel(id: string): string {
   return 'Gemini Flash';
 }
 
+const STREAM_SPEED_MS = 14;
+
 interface PlaygroundProps {
   hasInitialServerKey?: boolean;
 }
@@ -50,11 +52,10 @@ export default function Playground({ hasInitialServerKey = false }: PlaygroundPr
   const [selectedPreset, setSelectedPreset] = useState<PresetQuestion>(PRESETS[0]);
   const [customInput, setCustomInput] = useState('');
 
-  // Gemini API Key & Model state
+  // Gemini AI Server Key & Model state
   const [hasServerKey, setHasServerKey] = useState<boolean>(hasInitialServerKey);
-  const [apiKey, setApiKey] = useState<string>('');
   const [selectedModel, setSelectedModel] = useState<string>('gemini-3.5-flash-lite');
-  const isKeyActive = Boolean(hasServerKey || apiKey.trim());
+  const isKeyActive = Boolean(hasServerKey);
   const [isLiveGenerating, setIsLiveGenerating] = useState<boolean>(false);
   const [apiError, setApiError] = useState<string | null>(null);
   const [isShuffling, setIsShuffling] = useState<boolean>(false);
@@ -63,7 +64,6 @@ export default function Playground({ hasInitialServerKey = false }: PlaygroundPr
   // Streaming state
   const [streamedText, setStreamedText] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
-  const [streamSpeed, setStreamSpeed] = useState<number>(14); // ms per chunk
 
   // Inspector & UI settings
   const [activeTab, setActiveTab] = useState<'design' | 'media'>('design');
@@ -75,55 +75,20 @@ export default function Playground({ hasInitialServerKey = false }: PlaygroundPr
   const streamTimerRef = useRef<NodeJS.Timeout | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const streamContainerRef = useRef<HTMLDivElement | null>(null);
-  const mainColRef = useRef<HTMLDivElement>(null);
-  const [columnHeight, setColumnHeight] = useState<number | undefined>(undefined);
-  const [isDesktop, setIsDesktop] = useState(false);
 
-  // Synchronize the right column height precisely to the left column
+  // Synchronize server key availability and active model dynamically
   useEffect(() => {
-    const updateSize = () => {
-      setIsDesktop(window.innerWidth >= 768);
-      if (mainColRef.current) {
-        setColumnHeight(mainColRef.current.offsetHeight);
-      }
-    };
-    updateSize();
-    window.addEventListener('resize', updateSize);
-    const observer = new ResizeObserver(() => {
-      if (mainColRef.current) {
-        setColumnHeight(mainColRef.current.offsetHeight);
-      }
-    });
-    if (mainColRef.current) {
-      observer.observe(mainColRef.current);
-    }
-    return () => {
-      window.removeEventListener('resize', updateSize);
-      observer.disconnect();
-    };
-  }, []);
-
-  // Load API key & model choice from localStorage on mount, and check server key status
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const savedKey = localStorage.getItem('neanderthal_gemini_key') || '';
-      const savedModel = localStorage.getItem('neanderthal_gemini_model') || 'gemini-3.5-flash-lite';
-      setApiKey(savedKey);
-      setSelectedModel(savedModel);
-
-      // Verify server key availability dynamically
-      fetch('/api/key-status')
-        .then((res) => (res.ok ? res.json() : null))
-        .then((data) => {
-          if (data && typeof data.hasServerKey === 'boolean') {
-            setHasServerKey(data.hasServerKey);
-          }
-          if (data && typeof data.model === 'string' && data.model) {
-            setSelectedModel(data.model);
-          }
-        })
-        .catch(() => {});
-    }
+    fetch('/api/key-status')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data && typeof data.hasServerKey === 'boolean') {
+          setHasServerKey(data.hasServerKey);
+        }
+        if (data && typeof data.model === 'string' && data.model) {
+          setSelectedModel(data.model);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   // Auto-start initial preset stream on mount only
@@ -167,7 +132,7 @@ export default function Playground({ hasInitialServerKey = false }: PlaygroundPr
       } else {
         setStreamedText(fullContent.slice(0, currentIndex));
       }
-    }, streamSpeed);
+    }, STREAM_SPEED_MS);
   };
 
   // Live streaming directly from Google Gemini API
@@ -209,7 +174,6 @@ export default function Playground({ hasInitialServerKey = false }: PlaygroundPr
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           prompt: promptText,
-          apiKey: apiKey.trim() || undefined,
           model: selectedModel,
           visualsPerParagraph: Math.min(4, Math.max(1, capsuleSettings.visualsPerParagraph ?? 4)),
         }),
@@ -276,7 +240,6 @@ export default function Playground({ hasInitialServerKey = false }: PlaygroundPr
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          apiKey: apiKey.trim() || undefined,
           model: selectedModel,
           excludeTitles: recentTitles,
         }),
@@ -431,9 +394,9 @@ export default function Playground({ hasInitialServerKey = false }: PlaygroundPr
         </section>
 
         {/* Two-Column Layout: Left (Chat) + Right (Control Property) */}
-        <div className="grid grid-cols-1 md:grid-cols-[1fr_290px] gap-4 items-start w-full">
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_290px] gap-4 items-stretch w-full">
           {/* Left Column: Chat & Live Streaming */}
-          <div ref={mainColRef} className="flex flex-col gap-3.5 min-w-0">
+          <div className="flex flex-col gap-3.5 min-w-0">
 
           {/* Chat Stream Card */}
           <div className="rounded-2xl bg-[#101114] border border-white/[0.08] shadow-2xl flex flex-col overflow-hidden">
@@ -534,10 +497,7 @@ export default function Playground({ hasInitialServerKey = false }: PlaygroundPr
         </div>
 
         {/* Right Column: Control Property Sidebar */}
-        <aside
-          style={isDesktop && columnHeight ? { height: `${columnHeight}px`, maxHeight: `${columnHeight}px` } : undefined}
-          className="w-full md:w-[290px] shrink-0 flex flex-col min-h-0"
-        >
+        <aside className="w-full md:w-[290px] shrink-0 flex flex-col h-full min-h-0">
           <div className="rounded-2xl bg-[#101114] border border-white/[0.08] shadow-xl overflow-hidden flex flex-col h-full min-h-0">
             {/* Tabs */}
             <div className="flex items-center border-b border-white/[0.08] bg-[#14151a] h-11 shrink-0">
