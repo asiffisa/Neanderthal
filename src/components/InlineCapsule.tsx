@@ -21,6 +21,10 @@ interface InlineCapsuleProps {
   context?: string;
 }
 
+export function shouldShowHoverPreview(pointerType: string, canHover: boolean) {
+  return canHover && (pointerType === 'mouse' || pointerType === 'pen');
+}
+
 export const InlineCapsule: React.FC<InlineCapsuleProps> = memo(({
   query,
   fallbackUrl,
@@ -132,7 +136,7 @@ export const InlineCapsule: React.FC<InlineCapsuleProps> = memo(({
     }
   }, []);
 
-  const handleMouseEnter = () => {
+  const handleHoverEnter = () => {
     if (closeTimeoutRef.current) {
       clearTimeout(closeTimeoutRef.current);
       closeTimeoutRef.current = null;
@@ -142,6 +146,27 @@ export const InlineCapsule: React.FC<InlineCapsuleProps> = memo(({
     hoverTimeoutRef.current = setTimeout(() => {
       setIsHovered(true);
     }, 60);
+  };
+
+  const handlePointerEnter = (event: React.PointerEvent<HTMLSpanElement>) => {
+    // Mobile browsers can synthesize mouse events after a tap. Require both a
+    // real hover-capable device and a mouse/pen event before showing the card.
+    const canHover = window.matchMedia?.('(any-hover: hover)').matches ?? false;
+    if (!shouldShowHoverPreview(event.pointerType, canHover)) return;
+    handleHoverEnter();
+  };
+
+  const handleInspect = () => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+    if (closeTimeoutRef.current) {
+      clearTimeout(closeTimeoutRef.current);
+      closeTimeoutRef.current = null;
+    }
+    setIsHovered(false);
+    onInspect?.(media);
   };
 
   // Recalculate position dynamically if scrolled or resized while open
@@ -222,7 +247,7 @@ export const InlineCapsule: React.FC<InlineCapsuleProps> = memo(({
       <span
         ref={capsuleRef}
         className="relative inline-block select-none"
-        onMouseEnter={handleMouseEnter}
+        onPointerEnter={handlePointerEnter}
         onMouseLeave={handleMouseLeave}
       >
         <motion.button
@@ -231,7 +256,7 @@ export const InlineCapsule: React.FC<InlineCapsuleProps> = memo(({
           whileHover={settings.hoverScale ? { scale: 1.06 } : undefined}
           whileTap={{ scale: 0.96 }}
           transition={{ type: 'spring', stiffness: 450, damping: 28 }}
-          onClick={() => onInspect?.(media)}
+          onClick={handleInspect}
           aria-label={media.title || query}
           title={media.title || query}
           className={`group relative overflow-hidden transition-all duration-200 border ${
@@ -319,7 +344,7 @@ export const InlineCapsule: React.FC<InlineCapsuleProps> = memo(({
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    onInspect?.(media);
+                    handleInspect();
                   }}
                   className="absolute top-2 right-2 p-1.5 rounded-md bg-black/60 hover:bg-black/80 text-white/80 hover:text-white border border-white/10 transition-colors"
                   title="Expand image"
@@ -330,14 +355,9 @@ export const InlineCapsule: React.FC<InlineCapsuleProps> = memo(({
             )}
 
             {/* Title & metadata */}
-            <div className="flex items-start justify-between gap-2 mb-1">
+            <div className="mb-1">
               <span className="block text-sm font-semibold text-white tracking-tight leading-snug">
                 {media.title || query}
-              </span>
-              <span
-                className="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded border border-white/15 bg-white/10 text-zinc-300 shrink-0 font-medium"
-              >
-                {media.vendor === 'duckduckgo' ? 'DuckDuckGo' : 'Wikipedia'}
               </span>
             </div>
 

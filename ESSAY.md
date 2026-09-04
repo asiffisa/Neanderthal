@@ -40,7 +40,7 @@ This is easier to try than to describe, so I made a playground, try below.
 
 ## Why this thought experiment
 
-Research on multimedia learning is direct about this. People understand words and pictures better when the two sit together, which is called the spatial contiguity principle. It states that people learn better when corresponding words and pictures are placed close together rather than far apart on a page or screen.
+Research on multimedia learning is direct about this. People understand words and pictures better when the two sit together, which is called the **spatial contiguity principle**. It states that people learn better when corresponding words and pictures are placed close together rather than far apart on a page or screen.
 
 The same research warns you the other way too. Interesting but irrelevant images, the ones researchers call seductive details, reliably make comprehension worse. Readers keep the decoration and lose the argument.
 
