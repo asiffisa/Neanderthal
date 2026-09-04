@@ -371,6 +371,8 @@ export default function Playground({ hasInitialServerKey = false }: PlaygroundPr
               return (
                 <button
                   key={preset.id}
+                  type="button"
+                  aria-pressed={isSelected}
                   onClick={() => {
                     setSelectedPreset(preset);
                     if (isKeyActive) {
@@ -381,7 +383,7 @@ export default function Playground({ hasInitialServerKey = false }: PlaygroundPr
                   }}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all shrink-0 border active:scale-[0.96] ${
                     isSelected
-                      ? 'bg-white text-zinc-950 border-white shadow-sm font-semibold'
+                      ? 'bg-white/20 text-white border-white/30 shadow-sm font-semibold'
                       : 'bg-white/[0.04] border-white/[0.08] text-zinc-400 hover:bg-white/[0.08] hover:text-zinc-200'
                   }`}
                 >
