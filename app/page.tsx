@@ -104,7 +104,13 @@ export default async function EssayPage() {
                   )}
                   {heading === playgroundHeading && (
                     <section id="playground" aria-label="Neanderthal playground" className={styles.playground}>
-                      <Playground />
+                      <Playground
+                        hasInitialServerKey={Boolean(
+                          process.env.GEMINI_API_KEY?.trim() ||
+                          process.env.Gemini?.trim() ||
+                          process.env.GEMINI?.trim()
+                        )}
+                      />
                     </section>
                   )}
                 </section>

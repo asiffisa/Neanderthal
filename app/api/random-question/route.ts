@@ -359,7 +359,7 @@ export async function POST(request: NextRequest) {
         (body.excludeTitles !== undefined && (!Array.isArray(body.excludeTitles) || body.excludeTitles.length > 25 || body.excludeTitles.some((title) => typeof title !== 'string' || title.length > 200)))) {
       throw new RequestError('Invalid shuffle parameters', 400);
     }
-    const serverKey = process.env.GEMINI_API_KEY;
+    const serverKey = process.env.GEMINI_API_KEY || process.env.Gemini || process.env.GEMINI;
     const apiKey = clientKey?.trim() || serverKey?.trim();
     const excludeTitles: string[] = Array.isArray(body.excludeTitles) ? body.excludeTitles : [];
 

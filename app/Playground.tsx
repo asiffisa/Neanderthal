@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import {
   Sliders,
   Image as ImageIcon,
@@ -9,9 +8,6 @@ import {
   ChevronRight,
   Send,
   Shuffle,
-  Key,
-  X,
-  ExternalLink,
   AlertCircle,
 } from 'lucide-react';
 import { PRESETS, PresetQuestion } from '../src/lib/presets';
@@ -45,16 +41,20 @@ function getModelFullLabel(id: string): string {
   return 'Gemini Flash';
 }
 
-export default function Playground() {
+interface PlaygroundProps {
+  hasInitialServerKey?: boolean;
+}
+
+export default function Playground({ hasInitialServerKey = false }: PlaygroundProps) {
   // Preset & Input state
   const [selectedPreset, setSelectedPreset] = useState<PresetQuestion>(PRESETS[0]);
   const [customInput, setCustomInput] = useState('');
 
   // Gemini API Key & Model state
+  const [hasServerKey, setHasServerKey] = useState<boolean>(hasInitialServerKey);
   const [apiKey, setApiKey] = useState<string>('');
-  const [keyDraft, setKeyDraft] = useState<string>('');
   const [selectedModel, setSelectedModel] = useState<string>('gemini-3.8-flash');
-  const [showKeyModal, setShowKeyModal] = useState<boolean>(false);
+  const isKeyActive = Boolean(hasServerKey || apiKey.trim());
   const [isLiveGenerating, setIsLiveGenerating] = useState<boolean>(false);
   const [apiError, setApiError] = useState<string | null>(null);
   const [isShuffling, setIsShuffling] = useState<boolean>(false);
@@ -103,14 +103,23 @@ export default function Playground() {
     };
   }, []);
 
-  // Load API key & model choice from localStorage on mount
+  // Load API key & model choice from localStorage on mount, and check server key status
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedKey = localStorage.getItem('neanderthal_gemini_key') || '';
       const savedModel = localStorage.getItem('neanderthal_gemini_model') || 'gemini-3.8-flash';
       setApiKey(savedKey);
-      setKeyDraft(savedKey);
       setSelectedModel(savedModel);
+
+      // Verify server key availability dynamically
+      fetch('/api/key-status')
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data && typeof data.hasServerKey === 'boolean') {
+            setHasServerKey(data.hasServerKey);
+          }
+        })
+        .catch(() => {});
     }
   }, []);
 
@@ -197,7 +206,7 @@ export default function Playground() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           prompt: promptText,
-          apiKey,
+          apiKey: apiKey.trim() || undefined,
           model: selectedModel,
           visualsPerParagraph: Math.min(4, Math.max(1, capsuleSettings.visualsPerParagraph ?? 4)),
         }),
@@ -264,7 +273,7 @@ export default function Playground() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          apiKey,
+          apiKey: apiKey.trim() || undefined,
           model: selectedModel,
           excludeTitles: recentTitles,
         }),
@@ -287,7 +296,7 @@ export default function Playground() {
         };
         setSelectedPreset(newQuestion);
 
-        if (apiKey.trim()) {
+        if (isKeyActive) {
           // Stream an answer with a small number of high-value visual capsules
           await streamFromGemini(prompt, title, category, icon);
         } else {
@@ -296,7 +305,7 @@ export default function Playground() {
           if (matchingPreset) {
             startStreaming(matchingPreset.response);
           } else {
-            const fallbackAnswer = `Explore the fascinating science of **${title}** ${createNeanderthalMediaMarkdown(title)}. Connect your free Google Gemini API key above to generate unscripted live research with focused visual media capsules for this topic.`;
+            const fallbackAnswer = `Explore the fascinating science of **${title}** ${createNeanderthalMediaMarkdown(title)}. Discover unscripted scientific research with focused visual media capsules.`;
             startStreaming(fallbackAnswer);
           }
         }
@@ -307,7 +316,7 @@ export default function Playground() {
       const available = PRESETS.filter((p) => p.id !== selectedPreset.id);
       const random = available[Math.floor(Math.random() * available.length)] || PRESETS[0];
       setSelectedPreset(random);
-      if (apiKey.trim()) {
+      if (isKeyActive) {
         streamFromGemini(random.prompt, random.title, random.category, random.icon);
       } else {
         startStreaming(random.response);
@@ -324,7 +333,7 @@ export default function Playground() {
     const queryText = customInput.trim();
     setCustomInput('');
 
-    if (apiKey.trim()) {
+    if (isKeyActive) {
       streamFromGemini(queryText, 'Live Exploration', 'Nature & Science', '🔬');
     } else {
       const newCustomPreset: PresetQuestion = {
@@ -342,25 +351,6 @@ export default function Playground() {
     }
   };
 
-  const handleSaveKey = () => {
-    const trimmed = keyDraft.trim();
-    setApiKey(trimmed);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('neanderthal_gemini_key', trimmed);
-    }
-    setShowKeyModal(false);
-    setApiError(null);
-  };
-
-  const handleClearKey = () => {
-    setApiKey('');
-    setKeyDraft('');
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('neanderthal_gemini_key');
-    }
-    setShowKeyModal(false);
-    setApiError(null);
-  };
 
   // Memoize tokens to prevent redundant regex parsing on unrelated state changes
   const activeTokens: MarkdownToken[] = useMemo(() => {
@@ -417,7 +407,7 @@ export default function Playground() {
                   key={preset.id}
                   onClick={() => {
                     setSelectedPreset(preset);
-                    if (apiKey.trim()) {
+                    if (isKeyActive) {
                       streamFromGemini(preset.prompt, preset.title, preset.category, preset.icon);
                     } else {
                       startStreaming(preset.response);
@@ -434,30 +424,6 @@ export default function Playground() {
                 </button>
               );
             })}
-          </div>
-
-          {/* Gemini API Key Button */}
-          <div className="shrink-0 pl-2">
-            <button
-              type="button"
-              onClick={() => setShowKeyModal(true)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border active:scale-[0.96] ${
-                apiKey
-                  ? 'bg-white/[0.08] border-white/20 text-zinc-200 hover:bg-white/[0.12]'
-                  : 'bg-white/[0.04] border-white/[0.08] text-zinc-400 hover:bg-white/[0.08] hover:text-zinc-200'
-              }`}
-              title={apiKey ? 'Gemini API Key Connected' : 'Add Gemini API Key for live unscripted answers'}
-            >
-              <Key className="w-3.5 h-3.5 text-zinc-300" />
-              <span className="hidden sm:inline">
-                {apiKey ? getModelShortLabel(selectedModel) : 'Add Key'}
-              </span>
-              <span
-                className={`w-1.5 h-1.5 rounded-full ${
-                  apiKey ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.5)]' : 'bg-zinc-600'
-                }`}
-              />
-            </button>
           </div>
         </section>
 
@@ -514,10 +480,10 @@ export default function Playground() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => setShowKeyModal(true)}
+                    onClick={() => setApiError(null)}
                     className="px-2.5 py-1 rounded bg-red-500/20 hover:bg-red-500/30 text-red-200 text-[11px] font-medium shrink-0 transition-colors"
                   >
-                    Fix Key
+                    Dismiss
                   </button>
                 </div>
               )}
@@ -738,111 +704,6 @@ export default function Playground() {
       </div>
       </div>
 
-      {/* Gemini API Key Configuration Modal */}
-      <AnimatePresence>
-        {showKeyModal && (
-          <div className="fixed inset-0 z-[20000] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 8 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 6 }}
-              className="w-full max-w-md p-6 rounded-2xl bg-[#131418] border border-white/15 shadow-2xl space-y-4 text-left"
-            >
-              <div className="flex items-center justify-between pb-2 border-b border-white/10">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-zinc-200">
-                    <Key className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-semibold text-white">Google Gemini API Key</h3>
-                    <p className="text-[11px] text-zinc-400">Enables unscripted streaming for any science prompt</p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowKeyModal(false)}
-                  className="p-1.5 rounded-lg hover:bg-white/10 text-zinc-400 hover:text-white transition-colors"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-xs text-zinc-300 font-medium block">
-                  Paste your Gemini API Key
-                </label>
-                <input
-                  type="password"
-                  value={keyDraft}
-                  onChange={(e) => setKeyDraft(e.target.value)}
-                  placeholder="AIzaSy..."
-                  className="w-full bg-black/50 border border-white/15 focus:border-white/30 focus:ring-1 focus:ring-white/20 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-zinc-600 focus:outline-none font-mono transition-all"
-                />
-                <p className="text-[11px] text-zinc-500">
-                  Your key is saved locally in your browser&apos;s localStorage and sent securely to your local dev server.
-                </p>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs text-zinc-300 font-medium block">
-                  Gemini Model
-                </label>
-                <select
-                  value={selectedModel}
-                  onChange={(e) => {
-                    const newModel = e.target.value;
-                    setSelectedModel(newModel);
-                    if (typeof window !== 'undefined') {
-                      localStorage.setItem('neanderthal_gemini_model', newModel);
-                    }
-                  }}
-                  className="w-full bg-black/50 border border-white/15 focus:border-white/30 focus:ring-1 focus:ring-white/20 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none transition-all cursor-pointer"
-                >
-                  <option value="gemini-3.8-flash">Gemini 3.8 Flash (Latest Flagship)</option>
-                  <option value="gemini-3.6-flash">Gemini 3.6 Flash</option>
-                  <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash Lite</option>
-                  <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-                  <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
-                </select>
-                <p className="text-[11px] text-zinc-500">
-                  Defaults to Gemini 3.8 Flash with automatic fallback cascade.
-                </p>
-              </div>
-
-              <div className="pt-2 flex items-center justify-between gap-2 border-t border-white/10 text-xs">
-                <a
-                  href="https://aistudio.google.com/app/apikey"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-zinc-300 hover:text-white underline decoration-zinc-600 font-medium transition-colors text-[11px]"
-                >
-                  Get a free key from Google AI Studio
-                  <ExternalLink className="w-3 h-3" />
-                </a>
-
-                <div className="flex items-center gap-2">
-                  {apiKey && (
-                    <button
-                      type="button"
-                      onClick={handleClearKey}
-                      className="px-3 py-1.5 rounded-lg border border-red-500/30 text-red-400 hover:bg-red-500/10 font-medium transition-colors active:scale-[0.96]"
-                    >
-                      Clear
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={handleSaveKey}
-                    className="px-4 py-1.5 rounded-lg bg-white hover:bg-zinc-200 text-black font-semibold transition-all shadow-sm active:scale-[0.96]"
-                  >
-                    Save Key
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
 
       {/* Lightbox Inspection Modal */}
       <MediaLightbox media={inspectMedia} onClose={handleCloseLightbox} />

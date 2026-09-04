@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
         (body.model !== undefined && (typeof body.model !== 'string' || !/^gemini-[a-z0-9.-]{1,70}$/.test(body.model)))) {
       throw new RequestError('Invalid API key or model', 400);
     }
-    const serverKey = process.env.GEMINI_API_KEY;
+    const serverKey = process.env.GEMINI_API_KEY || process.env.Gemini || process.env.GEMINI;
     const apiKey = clientKey?.trim() || serverKey?.trim();
 
     if (typeof prompt !== 'string' || !prompt.trim() || prompt.length > 10000) {
