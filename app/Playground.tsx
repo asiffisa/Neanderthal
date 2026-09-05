@@ -9,7 +9,7 @@ import {
   Shuffle,
   AlertCircle,
 } from 'lucide-react';
-import { PRESETS, PresetQuestion } from '../src/lib/presets';
+import { DEFAULT_PRESET, PresetQuestion } from '../src/lib/presets';
 import {
   CapsuleSettings,
   DEFAULT_CAPSULE_SETTINGS,
@@ -48,7 +48,7 @@ interface PlaygroundProps {
 
 export default function Playground({ hasInitialServerKey = false }: PlaygroundProps) {
   // Preset & Input state
-  const [selectedPreset, setSelectedPreset] = useState<PresetQuestion>(PRESETS[0]);
+  const [selectedPreset, setSelectedPreset] = useState<PresetQuestion>(DEFAULT_PRESET);
   const [customInput, setCustomInput] = useState('');
 
   // Gemini AI Server Key & Model state
@@ -92,7 +92,7 @@ export default function Playground({ hasInitialServerKey = false }: PlaygroundPr
 
   // Auto-start initial preset stream on mount only
   useEffect(() => {
-    startStreaming(PRESETS[0].response);
+    startStreaming(DEFAULT_PRESET.response);
     return () => {
       stopStreaming();
       if (abortControllerRef.current) {
@@ -206,16 +206,14 @@ export default function Playground({ hasInitialServerKey = false }: PlaygroundPr
       const msg = err instanceof Error ? err.message : 'Streaming error occurred';
       console.error('[Gemini Stream Error]:', msg);
       if (abortControllerRef.current === controller) {
-        // Graceful fallback: If this topic has a curated scripted response, recover smoothly!
-        const matchingPreset = PRESETS.find(
-          (p) =>
-            p.title.toLowerCase() === title.toLowerCase() ||
-            p.prompt.toLowerCase() === promptText.toLowerCase()
-        );
-        if (matchingPreset && matchingPreset.response) {
+        // Graceful fallback: If this topic matches default preset, recover smoothly
+        if (
+          title.toLowerCase() === DEFAULT_PRESET.title.toLowerCase() ||
+          promptText.toLowerCase() === DEFAULT_PRESET.prompt.toLowerCase()
+        ) {
           console.warn('[Gemini Stream]: Recovered smoothly using pre-scripted response for:', title);
-          setSelectedPreset(matchingPreset);
-          startStreaming(matchingPreset.response);
+          setSelectedPreset(DEFAULT_PRESET);
+          startStreaming(DEFAULT_PRESET.response);
           setApiError(null);
           return;
         }
@@ -265,26 +263,18 @@ export default function Playground({ hasInitialServerKey = false }: PlaygroundPr
           // Stream an answer with a small number of high-value visual capsules
           await streamFromGemini(prompt, title, category, icon);
         } else {
-          // If offline / no key, find if there is a matching preset or inform user
-          const matchingPreset = PRESETS.find((p) => p.title.toLowerCase() === title.toLowerCase());
-          if (matchingPreset) {
-            startStreaming(matchingPreset.response);
-          } else {
-            const fallbackAnswer = `Explore the fascinating science of **${title}** ${createNeanderthalMediaMarkdown(title)}. Discover unscripted scientific research with focused visual media capsules.`;
-            startStreaming(fallbackAnswer);
-          }
+          const fallbackAnswer = `Explore the fascinating science of **${title}** ${createNeanderthalMediaMarkdown(title)}. Discover unscripted scientific research with focused visual media capsules.`;
+          startStreaming(fallbackAnswer);
         }
       }
     } catch (err) {
       console.error('[Shuffle Error]:', err);
-      // Fallback to non-repeating preset from local bank
-      const available = PRESETS.filter((p) => p.id !== selectedPreset.id);
-      const random = available[Math.floor(Math.random() * available.length)] || PRESETS[0];
-      setSelectedPreset(random);
+      // Fallback to default preset
+      setSelectedPreset(DEFAULT_PRESET);
       if (isKeyActive) {
-        streamFromGemini(random.prompt, random.title, random.category, random.icon);
+        streamFromGemini(DEFAULT_PRESET.prompt, DEFAULT_PRESET.title, DEFAULT_PRESET.category, DEFAULT_PRESET.icon);
       } else {
-        startStreaming(random.response);
+        startStreaming(DEFAULT_PRESET.response);
       }
     } finally {
       setIsShuffling(false);
@@ -361,39 +351,6 @@ export default function Playground({ hasInitialServerKey = false }: PlaygroundPr
   return (
     <div className="w-full min-w-0 text-[#fafafa] selection:bg-white/20 selection:text-white">
       <div className="w-full max-w-[800px] flex flex-col gap-4">
-        {/* Preset & Control Action Bar */}
-        <section className="flex items-center justify-between gap-3 overflow-x-auto pb-1 scrollbar-none">
-          <div className="flex items-center gap-2 shrink-0">
-            {/* Presets List */}
-            {PRESETS.map((preset) => {
-              const isSelected = selectedPreset.id === preset.id;
-              return (
-                <button
-                  key={preset.id}
-                  type="button"
-                  aria-pressed={isSelected}
-                  onClick={() => {
-                    setSelectedPreset(preset);
-                    if (isKeyActive) {
-                      streamFromGemini(preset.prompt, preset.title, preset.category, preset.icon);
-                    } else {
-                      startStreaming(preset.response);
-                    }
-                  }}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all shrink-0 border active:scale-[0.96] ${
-                    isSelected
-                      ? 'bg-white/20 text-white border-white/30 shadow-sm font-semibold'
-                      : 'bg-white/[0.04] border-white/[0.08] text-zinc-400 hover:bg-white/[0.08] hover:text-zinc-200'
-                  }`}
-                >
-                  <span>{preset.icon}</span>
-                  <span>{preset.title}</span>
-                </button>
-              );
-            })}
-          </div>
-        </section>
-
         {/* Two-Column Layout: Left (Chat) + Right (Control Property) */}
         <div className="grid grid-cols-1 md:grid-cols-[1fr_290px] gap-4 items-stretch w-full">
           {/* Left Column: Chat & Live Streaming */}
