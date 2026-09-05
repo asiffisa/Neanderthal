@@ -490,7 +490,8 @@ export default function Playground({ hasInitialServerKey = false }: PlaygroundPr
             <div className="p-5 overflow-y-auto flex-1 min-h-0 space-y-6 text-xs">
               {/* Tab 1: Design Controls */}
               {activeTab === 'design' && (
-                <div className="space-y-5">
+                <div>
+                  <div className="space-y-5">
                   {[
                     {
                       label: 'Capsule Height',
@@ -569,8 +570,9 @@ export default function Playground({ hasInitialServerKey = false }: PlaygroundPr
                       </div>
                     );
                   })}
+                  </div>
 
-                  <div className="pt-3 border-t border-white/10">
+                  <div className="mt-6 pt-6 border-t border-white/10">
                     <button
                       type="button"
                       onClick={() => setCapsuleSettings({ ...DEFAULT_CAPSULE_SETTINGS })}
