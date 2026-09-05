@@ -8,5 +8,8 @@ describe('HeaderLottie', () => {
     const html = renderToStaticMarkup(<HeaderLottie />);
     expect(html).toContain('aria-hidden="true"');
     expect(html).toContain('aspect-[219/215]');
+    expect(html).toContain('rounded-[8px]');
+    expect(html).toContain('overflow-hidden');
   });
 });
+
