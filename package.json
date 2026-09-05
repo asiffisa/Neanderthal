@@ -13,6 +13,7 @@
   "dependencies": {
     "framer-motion": "^12.4.7",
     "ipaddr.js": "^2.5.0",
+    "lottie-web": "^5.13.0",
     "lucide-react": "^0.475.0",
     "mdast-util-from-markdown": "^2.0.3",
     "next": "^15.1.7",

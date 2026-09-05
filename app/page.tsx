@@ -3,6 +3,7 @@ import path from 'node:path';
 import Image from 'next/image';
 import Playground from './Playground';
 import { EssayMarkdown } from '../src/components/EssayMarkdown';
+import { HeaderLottie } from '../src/components/HeaderLottie';
 import styles from './essay.module.css';
 
 const playgroundHeading = 'Put the picture where the meaning happens';
@@ -86,9 +87,13 @@ export default async function EssayPage() {
               />
             </figure>
             <header className={styles.header}>
-              <h1>{title}</h1>
+              <div className="flex items-center gap-3.5 sm:gap-4">
+                <HeaderLottie />
+                <h1>{title}</h1>
+              </div>
               {subtitle && <p>{subtitle}</p>}
             </header>
+
 
             {sections.map((section) => {
               const heading = section.match(/^## (.+)/)?.[1] || '';
