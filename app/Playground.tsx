@@ -384,7 +384,7 @@ export default function Playground({ hasInitialServerKey = false }: PlaygroundPr
                     isBusy ? 'text-zinc-400' : 'text-zinc-400 group-hover:text-white group-hover:rotate-180'
                   }`}
                 />
-                <span>{isShuffling ? 'Inventing...' : isStreaming ? 'Streaming...' : 'Shuffle'}</span>
+                <span>{isShuffling ? 'Scripting...' : isStreaming ? 'Streaming...' : 'Shuffle'}</span>
               </button>
             </div>
 
