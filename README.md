@@ -1,12 +1,25 @@
 # Neanderthal
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
+[![Next.js](https://img.shields.io/badge/Next.js-15-black?style=flat-square&logo=next.js)](https://nextjs.org)
+[![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=white)](https://react.dev)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+
 Inline image capsules for streaming Markdown. Write ordinary prose, drop a marker after a subject, and the renderer resolves an image without interrupting the text.
 
 ```markdown
 An anglerfish ![Deep sea anglerfish](neanderthal:image) attracts prey with a glowing lure.
 ```
 
-This repo is a Next.js playground demonstrating the renderer. Copy the source into your own app — there is no npm package.
+## About
+
+For most of writing's history, images lived *inside* the text. Egyptian hieroglyphs, Maya glyphs, and cuneiform all carried sound and picture in the same line. Modern writing traded that for speed: 26 reusable letters can spell anything, but a word can name a thing without ever showing it to you. The pictures moved out of the sentence and became citations, thumbnails, and links you have to leave the page for.
+
+Research on multimedia learning calls the fix the **spatial contiguity principle** — people understand words and pictures better when the two sit close together. The same research warns the other way: *seductive details*, interesting but irrelevant images, reliably make comprehension worse. So the goal is not a picture on every line. It is zero distance between an unfamiliar idea and the one image that resolves it, and nothing else.
+
+What is new is that AI can do the joining at the moment of explanation: spot the visual concept, find a trustworthy image, place it beside the right phrase, and keep the source attached. That is what this repo tries out. The long version is in [ESSAY.md](ESSAY.md).
+
+This is a Next.js playground demonstrating the renderer. Copy the source into your own app — there is no npm package.
 
 ## Run it
 
