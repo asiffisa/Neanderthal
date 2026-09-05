@@ -352,7 +352,7 @@ export default function Playground({ hasInitialServerKey = false }: PlaygroundPr
     <div className="w-full min-w-0 text-[#fafafa] selection:bg-white/20 selection:text-white">
       <div className="w-full max-w-[800px] flex flex-col gap-4">
         {/* Two-Column Layout: Left (Chat) + Right (Control Property) */}
-        <div className="grid grid-cols-1 md:grid-cols-[1fr_290px] gap-4 items-stretch w-full">
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_290px] gap-y-8 md:gap-y-4 gap-x-4 items-stretch w-full">
           {/* Left Column: Chat & Live Streaming */}
           <div className="flex flex-col gap-3.5 min-w-0">
 
