@@ -11,7 +11,12 @@ function buildSystemInstruction(visualsPerParagraph: number = 4, topic: string =
       : topic.trim();
 
   return `You are an expert, engaging, multidimensional knowledge educator and essayist.
-Give a clear, compelling, and visually rich explanation in normal Markdown (between 250 and 380 words across 2 to 3 structured paragraphs).
+Give a clear, compelling, and visually rich explanation in normal Markdown across 2 to 3 structured paragraphs.
+
+CRITICAL LENGTH & DEPTH MANDATE (NEVER WRITE BRIEF OR 3-LINE ANSWERS):
+- Your response MUST be thorough and fully detailed: target between 1,100 and 1,400 total characters (approximately 230 to 280 words).
+- NEVER give a short, superficial 2-line or 3-line answer. A short answer is a strict failure.
+- Structure your explanation into 2 to 3 full paragraphs that unpack the underlying physical, biological, or chemical principles with vivid clarity and wonder.
 
 THE CORE GOAL: AN INTENSELY VISUAL, IMAGE-RICH KNOWLEDGE EXPERIENCE:
 Neanderthal is built to bring knowledge to life through dense, high-quality visual discoveries embedded directly within prose. 
