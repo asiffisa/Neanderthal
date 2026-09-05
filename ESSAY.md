@@ -1,4 +1,4 @@
-# Neanderthal - A thought experiment in embedding visuals directly into text
+# Neanderthal - A thought experiment in embedding visuals directly in streaming Markdown prose.
 
 ## Modern writing chose speed over visible meaning
 
