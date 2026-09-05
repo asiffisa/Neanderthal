@@ -10,9 +10,10 @@ Modern text didn't forget images. It pushed them out of the reading flow. It was
 
 ## The evolution of pictographic script
 
-Before we wrote words, we drew. Neanderthals pressed deliberate finger marks into a French cave wall more than 57,000 years ago. Artists in Sulawesi painted a hunting scene 51,200 years ago, the earliest known picture that tells a story. None of it is writing and none of it can be read as sentences, but it does prove one thing: humans held memory in pictures long before scripts held language.
+Before we wrote words, we drew. Neanderthals pressed deliberate finger marks into a French cave wall ![Cueva de las Manos](neanderthal:image?provider=wikipedia&fallback=https%3A%2F%2Fupload.wikimedia.org%2Fwikipedia%2Fcommons%2Fthumb%2F7%2F7a%2FPinturas_rupestres_-_Manos.jpg%2F960px-Pinturas_rupestres_-_Manos.jpg) more than 57,000 years ago. Artists in Sulawesi painted a hunting scene 51,200 years ago, the earliest known picture that tells a story. None of it is writing and none of it can be read as sentences, but it does prove one thing: humans held memory in pictures long before scripts held language.
 
 Then pictures learned to speak. For most of writing's history, images weren't placed next to the text. They *were* the text.
+
 
 ![Egyptian hieroglyphs](neanderthal:image?provider=wikipedia&fallback=https%3A%2F%2Fupload.wikimedia.org%2Fwikipedia%2Fcommons%2Fc%2Fc9%2FHieroglyphs_from_the_tomb_of_Seti_I.jpg) **Egyptian hieroglyphs** were a full writing system, not a gallery of drawings. A sign could carry a sound, a whole word, or a category of meaning. The signs called determinatives, or classifiers, sat at the end of a word and were never spoken aloud. They told the reader what kind of thing the word was: a person, a place, an action, an idea. Letters carried the sound and the picture carried the sense. Scribes also packed signs into balanced square groups and turned birds and figures to face the start of the line, so a page of text held together as an image.
 
