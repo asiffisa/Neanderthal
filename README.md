@@ -13,6 +13,8 @@ An anglerfish ![Deep sea anglerfish](neanderthal:image) attracts prey with a glo
 
 ## About
 
+![Neanderthal](public/neanderthal%20cover%20git.webp)
+
 For most of writing's history, images lived *inside* the text. Egyptian hieroglyphs, Maya glyphs, and cuneiform all carried sound and picture in the same line. Modern writing traded that for speed: 26 reusable letters can spell anything, but a word can name a thing without ever showing it to you. The pictures moved out of the sentence and became citations, thumbnails, and links you have to leave the page for.
 
 Research on multimedia learning calls the fix the **spatial contiguity principle** — people understand words and pictures better when the two sit close together. The same research warns the other way: *seductive details*, interesting but irrelevant images, reliably make comprehension worse. So the goal is not a picture on every line. It is zero distance between an unfamiliar idea and the one image that resolves it, and nothing else.
