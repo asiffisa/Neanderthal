@@ -17,7 +17,7 @@ For most of writing's history, images lived *inside* the text. Egyptian hierogly
 
 Research on multimedia learning calls the fix the **spatial contiguity principle** — people understand words and pictures better when the two sit close together. The same research warns the other way: *seductive details*, interesting but irrelevant images, reliably make comprehension worse. So the goal is not a picture on every line. It is zero distance between an unfamiliar idea and the one image that resolves it, and nothing else.
 
-What is new is that AI can do the joining at the moment of explanation: spot the visual concept, find a trustworthy image, place it beside the right phrase, and keep the source attached. That is what this repo tries out. The long version is in [ESSAY.md](ESSAY.md).
+What is new is that AI can do the joining at the moment of explanation: spot the visual concept, find a trustworthy image, place it beside the right phrase, and keep the source attached. That is what this repo tries out. The long version is in [ESSAY.md](https://neanderthal-script.vercel.app/).
 
 This is a Next.js playground demonstrating the renderer. Copy the source into your own app — there is no npm package.
 
