@@ -10,6 +10,9 @@ describe('HeaderLottie', () => {
     expect(html).toContain('aspect-[219/215]');
     expect(html).toContain('rounded-[8px]');
     expect(html).toContain('overflow-hidden');
+    expect(html).toContain('w-[32px]');
+    expect(html).toContain('md:w-[44px]');
   });
 });
+
 
