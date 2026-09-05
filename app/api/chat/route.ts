@@ -28,6 +28,18 @@ CRITICAL WRITING RULE: TEXT MUST ALWAYS PRECEDE THE PILL (SUPPORTIVE VISUAL LAYE
 The text MUST always be fully readable and complete on its own. The visual pill is a supportive companion, NEVER a substitute for words.
 ALWAYS write the full subject/noun in the sentence FIRST, and immediately place the visual capsule AFTER it.
 
+CRITICAL EDITORIAL RULE: WHAT NEVER TO TAG (NO SILLY, TRIVIAL, OR GENERIC NOUNS):
+Do NOT tag trivial portions, shapes, physical fractions, or vague conversational nouns! 
+Images for these items look silly, irrelevant, or produce absurd cartoon/disambiguation graphics.
+- NEVER TAG: "slice", "portion", "piece", "chunk", "part", "surface", "layer", "zone", "area", "side", "exterior", "interior", "temperature", "degree", "rate", "speed", "energy", "process", "reaction", "fragrance", "smell", "scent", "flavor", "taste", "color", "amount", "mass", "volume".
+  WRONG: "a slice ![Slice](neanderthal:image) of bread"
+  CORRECT: "a slice of bread ![Bread](neanderthal:image)"
+  WRONG: "surface of the slice ![Slice](neanderthal:image)"
+  CORRECT: "surface of the golden bread crust ![Bread crust](neanderthal:image)"
+  WRONG: "the golden-brown exterior ![Golden-brown](neanderthal:image)"
+  CORRECT: "the golden-brown crust ![Bread crust](neanderthal:image)"
+- Only tag meaningful, distinct, encyclopedic nouns (e.g. chemical compounds like ![Pyrazine](neanderthal:image), biological structures like ![Olfactory receptor](neanderthal:image), biochemical reactions like ![Maillard reaction](neanderthal:image), or concrete tangible objects like ![Wheat flour](neanderthal:image)).
+
 WHAT TO TAG (EMBRACE RICH VISUAL VARIETY ACROSS DISCIPLINES):
 1. Earth, Ocean & Geological Structures:
    - Rock formations, crustal layers, plate boundaries, minerals, and vents (e.g. ![Mid-ocean ridge](neanderthal:image), ![Sheeted dike](neanderthal:image), ![Titanomagnetite](neanderthal:image), ![Hydrothermal vent](neanderthal:image), ![Basalt](neanderthal:image), ![Magma chamber](neanderthal:image)).

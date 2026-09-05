@@ -52,4 +52,6 @@ None of this is a rollback to hieroglyphs. Words should keep doing what only wor
 
 What's new is that AI can join the two at the moment of explanation. It can spot the visual concept, find a trustworthy image, place it beside the right phrase, and keep the source attached.
 
-Neanderthal is a thought experiment inspired by scientific research and ancient history, to challenge the status quo of how humans can understand things better, by combining text and the corresponding image with AI.
+Neanderthal is a thought experiment, built on what ancient scripts already knew and what research on learning keeps confirming. It asks one question: do we understand things better when AI puts the image right next to the word that needs it?
+
+The experiment runs on general knowledge, so feel free to fork it and customise it for whatever you are working on.

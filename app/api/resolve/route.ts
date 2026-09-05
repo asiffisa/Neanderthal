@@ -9,6 +9,13 @@ const USER_AGENT =
   process.env.USER_AGENT ||
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 NeanderthalApp/1.0 (https://github.com/asiffisa/Neanderthal)';
 
+// Words that represent generic shapes, portions, or trivial conversational nouns that should never resolve to media
+const TRIVIAL_DISALLOWED_TERMS = new Set([
+  'slice', 'slices', 'portion', 'portions', 'piece', 'pieces', 'chunk', 'chunks',
+  'part', 'parts', 'side', 'sides', 'surface', 'surfaces', 'layer', 'layers',
+  'exterior', 'interior', 'amount', 'amounts', 'fraction', 'fractions'
+]);
+
 // Stop-words and descriptive adjectives to strip when simplifying complex phrases
 const STOP_WORDS = new Set([
   'the', 'a', 'an', 'and', 'or', 'of', 'in', 'on', 'at', 'to', 'for', 'with', 'by',
@@ -539,6 +546,23 @@ export async function GET(request: NextRequest) {
   const exclusions = new Set(excludedUrls.map(canonicalImageUrl));
   const cleanQuery = query.trim();
   const cacheKey = JSON.stringify([cleanQuery.toLowerCase(), context.toLowerCase(), requestedVendor, [...exclusions].sort(), occurrence]);
+
+  // Check if the query is a silly/trivial fraction or portion that shouldn't display an image
+  if (TRIVIAL_DISALLOWED_TERMS.has(cleanQuery.toLowerCase())) {
+    return NextResponse.json({
+      title: cleanQuery,
+      description: 'Generic term.',
+      thumbnailUrl: null,
+      fullImageUrl: null,
+      sourceUrl: '',
+      status: 'not-found',
+      vendor: 'wikipedia',
+    }, {
+      headers: {
+        'Cache-Control': 'public, s-maxage=86400',
+      },
+    });
+  }
 
   // 1. Instant Cache Hit
   const cached = serverResolveCache.get(cacheKey);
