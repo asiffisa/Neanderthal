@@ -13,7 +13,7 @@ An anglerfish ![Deep sea anglerfish](neanderthal:image) attracts prey with a glo
 
 ## About
 
-![Neanderthal](public/neanderthal%20cover%20git.webp)
+![Neanderthal](public/neanderthal-cover.webp)
 
 For most of writing's history, images lived *inside* the text. Egyptian hieroglyphs, Maya glyphs, and cuneiform all carried sound and picture in the same line. Modern writing traded that for speed: 26 reusable letters can spell anything, but a word can name a thing without ever showing it to you. The pictures moved out of the sentence and became citations, thumbnails, and links you have to leave the page for.
 
