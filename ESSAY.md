@@ -52,6 +52,6 @@ None of this is a rollback to hieroglyphs. Words should keep doing what only wor
 
 What's new is that AI can join the two at the moment of explanation. It can spot the visual concept, find a trustworthy image, place it beside the right phrase, and keep the source attached.
 
-Neanderthal is a thought experiment, built on what ancient scripts already knew and what research on learning keeps confirming. It asks one question: do we understand things better when AI puts the image right next to the word that needs it?
+Neanderthal is a thought experiment. Ancient scripts kept the picture inside the sentence and modern writing pushed it out. This puts it back, with AI placing the image next to the word that needs it.
 
-The experiment runs on general knowledge, so feel free to fork it and customise it for whatever you are working on.
+Right now the capsule engine pulls its visuals from Wikimedia and DuckDuckGo, leaning on Wikimedia for scientific and encyclopedic subjects and DuckDuckGo for people and culture. The experiment runs on general knowledge, so feel free to fork it and customise it for whatever you are working on.
