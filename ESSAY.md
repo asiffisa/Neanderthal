@@ -1,4 +1,4 @@
-# Neanderthal - Thought experiment on combining words with relevant images
+# Neanderthal - A thought experiment in embedding visuals directly into text
 
 ## Modern writing chose speed over visible meaning
 
