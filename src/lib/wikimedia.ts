@@ -66,8 +66,6 @@ export async function resolveMedia(
               thumbnailUrl,
               fullImageUrl: imageUrl(data.fullImageUrl) || thumbnailUrl,
               sourceUrl: imageUrl(data.sourceUrl),
-              width: typeof data.width === 'number' ? data.width : undefined,
-              height: typeof data.height === 'number' ? data.height : undefined,
               vendor: data.vendor === 'duckduckgo' ? 'duckduckgo' : 'wikipedia',
               status: 'loaded',
             };

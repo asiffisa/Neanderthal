@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BoundedCache } from '../../../src/lib/bounded-cache';
-import { fetchWithLimits } from '../../../src/lib/request-limits';
+import { abortStatus, fetchWithLimits } from '../../../src/lib/request-limits';
 import { canonicalImageUrl, parseImageProxyUrl } from '../../../src/lib/media-url';
 
 export const dynamic = 'force-dynamic';
@@ -9,7 +9,8 @@ const USER_AGENT =
   process.env.USER_AGENT ||
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 NeanderthalApp/1.0 (https://github.com/asiffisa/Neanderthal)';
 
-// Words that represent generic shapes, portions, metrics, or non-visual sensations that should never resolve to media
+// The system prompt asks the model to avoid these; a model is not a guarantee, so enforce it
+// here too and skip the upstream round trip entirely.
 const TRIVIAL_DISALLOWED_TERMS = new Set([
   // Geometric divisions & portions
   'slice', 'slices', 'portion', 'portions', 'piece', 'pieces', 'chunk', 'chunks',
@@ -23,7 +24,6 @@ const TRIVIAL_DISALLOWED_TERMS = new Set([
   'temperature', 'temperatures', 'degree', 'degrees', 'speed', 'speeds', 'velocity',
   'rate', 'rates', 'mass', 'volume', 'energy'
 ]);
-
 
 // Stop-words and descriptive adjectives to strip when simplifying complex phrases
 const STOP_WORDS = new Set([
@@ -39,40 +39,23 @@ const STOP_WORDS = new Set([
   'inner', 'outer', 'internal', 'external', 'primary', 'secondary', 'overall', 'respective'
 ]);
 
-/**
- * Normalizes English and Latin/Greek singular/plural forms (e.g. bacterium <-> bacteria, fungus <-> fungi).
- */
+const IRREGULAR_STEMS: Record<string, string> = {
+  bacteria: 'bacteri', bacterium: 'bacteri', protozoa: 'protozo', protozoon: 'protozo',
+  mitochondria: 'mitochondri', mitochondrion: 'mitochondri', cilia: 'cili', cilium: 'cili',
+  flagella: 'flagell', flagellum: 'flagell', algae: 'alg', alga: 'alg', fungi: 'fung',
+  fungus: 'fung', bacilli: 'bacill', bacillus: 'bacill', larvae: 'larv', larva: 'larv',
+  nuclei: 'nucle', nucleus: 'nucle', criteria: 'criteri', criterion: 'criteri',
+  phenomena: 'phenomen', phenomenon: 'phenomen', stimuli: 'stimul', stimulus: 'stimul',
+};
+
+/** Fold singular and plural to one key so "photons" still matches the article "Photon". */
 function stemWord(word: string): string {
   if (!word || word.length <= 3) return word;
   const w = word.toLowerCase();
-
-  // Latin / Greek scientific plurals and singulars
-  if (w === 'bacteria' || w === 'bacterium') return 'bacteri';
-  if (w === 'protozoa' || w === 'protozoon') return 'protozo';
-  if (w === 'mitochondria' || w === 'mitochondrion') return 'mitochondri';
-  if (w === 'cilia' || w === 'cilium') return 'cili';
-  if (w === 'flagella' || w === 'flagellum') return 'flagell';
-  if (w === 'algae' || w === 'alga') return 'alg';
-  if (w === 'fungi' || w === 'fungus') return 'fung';
-  if (w === 'bacilli' || w === 'bacillus') return 'bacill';
-  if (w === 'larvae' || w === 'larva') return 'larv';
-  if (w === 'pupae' || w === 'pupa') return 'pup';
-  if (w === 'antennae' || w === 'antenna') return 'antenn';
-  if (w === 'nuclei' || w === 'nucleus') return 'nucle';
-  if (w === 'criteria' || w === 'criterion') return 'criteri';
-  if (w === 'phenomena' || w === 'phenomenon') return 'phenomen';
-  if (w === 'stimuli' || w === 'stimulus') return 'stimul';
-  if (w === 'radii' || w === 'radius') return 'radi';
-
-  if (w.endsWith('ium') && w.length > 4) return w.slice(0, -3);
-  if (w.endsWith('um') && w.length > 4) return w.slice(0, -2);
-  if (w.endsWith('ia') && w.length > 4) return w.slice(0, -2);
-
-  // Standard English plurals
+  if (IRREGULAR_STEMS[w]) return IRREGULAR_STEMS[w];
   if (w.endsWith('ies') && w.length > 4) return w.slice(0, -3) + 'y';
   if (w.endsWith('es') && w.length > 4 && !w.endsWith('sses')) return w.slice(0, -2);
   if (w.endsWith('s') && w.length > 3 && !w.endsWith('ss')) return w.slice(0, -1);
-
   return w;
 }
 
@@ -191,11 +174,7 @@ function isRelevantWikipediaPage(pageTitle: string, query: string, context?: str
   return false;
 }
 
-function scoreWikipediaPage(
-  page: any,
-  query: string,
-  context?: string
-): number {
+function scoreWikipediaPage(page: any, query: string): number {
   let score = 50 - (page.index ?? 10) * 4;
 
   const normTitle = cleanAlphanumeric(page.title || '');
@@ -210,40 +189,18 @@ function scoreWikipediaPage(
     score += 25;
   }
 
-  const extract = (page.extract || '').toLowerCase();
   const title = (page.title || '').toLowerCase();
   const imgUrl = (page.thumbnail?.source || '').toLowerCase();
-  const fullContext = `${context || ''} ${query}`.toLowerCase();
-
-  // Detect if the user topic or query is scientific, natural, anatomical, or physical
-  const isScienceOrNature =
-    /\b(physics|biology|mechanics|acoustic|nature|science|cavitating|marine|cell|geology|chemistry|impact|shock|wave|quantum|astro|plant|space|crystal|enzyme|animal|species|organ|tissue|fiber|shrimp|mantis|molecular|armor|fracture|stress)\b/i.test(
-      fullContext
-    );
-
-  // Heavy penalty for software, video games, vehicles, brand logos, comics, music in science contexts
-  const isSoftwareOrMedia =
-    /\b(software|multimedia|video game|plug-in|arcade|album|single|fictional character|comic book|band|song|franchise|mascot|web browser|operating system|truck|tractor|race car|toy|merchandise)\b/i.test(
-      extract + ' ' + title
-    );
-
-  if (isScienceOrNature && isSoftwareOrMedia) {
-    score -= 90;
-  }
-
-  // Heavy penalty for illicit drugs / narcotics in science/engineering contexts
-  const isNarcotics =
-    /\b(cocaine|narcotic|illicit drug|controlled substance|recreational drug|hallucinogen|high on)\b/i.test(
-      extract + ' ' + title
-    );
-
-  if (isScienceOrNature && isNarcotics) {
-    score -= 100;
-  }
 
   // Disqualify vector logos, crests, SVGs, and Wikipedia template images
   if (isJunkOrMaintenanceImage(imgUrl)) {
     return -999;
+  }
+
+  // Wikipedia disambiguates a secondary sense with a parenthetical, e.g. "Shockwave (software)".
+  // An unqualified query asked for the primary sense, so prefer the article without one.
+  if (/\s\(.+\)$/.test(title) && !query.includes('(')) {
+    score -= 45;
   }
 
   // Penalize logos and icons in encyclopedic lookups
@@ -254,16 +211,6 @@ function scoreWikipediaPage(
     title.includes('logo')
   ) {
     score -= 40;
-  }
-
-  // Bonus for scientific or natural domain resonance
-  if (
-    isScienceOrNature &&
-    /\b(mechanics|acoustics|physics|propagation|disturbance|sound|pressure|acoustic|energy|medium|velocity|supersonic|mach|density|temperature|fluid|gas|material|biology|anatomical|organism|crystall|mineral|fracture|engineering|structural)\b/i.test(
-      extract
-    )
-  ) {
-    score += 50;
   }
 
   return score;
@@ -416,7 +363,7 @@ async function searchWikipedia(
 
     const scoredPages = validPages
       .filter((p) => isRelevantWikipediaPage(p.title || '', searchTerm, context, p.extract))
-      .map((p) => ({ page: p, score: scoreWikipediaPage(p, searchTerm, context) }))
+      .map((p) => ({ page: p, score: scoreWikipediaPage(p, searchTerm) }))
       .filter((item) => item.score > 0)
       .sort((a, b) => b.score - a.score);
 
@@ -556,7 +503,7 @@ export async function GET(request: NextRequest) {
   const cleanQuery = query.trim();
   const cacheKey = JSON.stringify([cleanQuery.toLowerCase(), context.toLowerCase(), requestedVendor, [...exclusions].sort(), occurrence]);
 
-  // Check if the query is a silly/trivial fraction or portion that shouldn't display an image
+  // A generic shape, portion or sensation has no photograph; do not spend a request finding out.
   if (TRIVIAL_DISALLOWED_TERMS.has(cleanQuery.toLowerCase())) {
     return NextResponse.json({
       title: cleanQuery,
@@ -566,11 +513,7 @@ export async function GET(request: NextRequest) {
       sourceUrl: '',
       status: 'not-found',
       vendor: 'wikipedia',
-    }, {
-      headers: {
-        'Cache-Control': 'public, s-maxage=86400',
-      },
-    });
+    }, { headers: { 'Cache-Control': 'public, s-maxage=86400' } });
   }
 
   // 1. Instant Cache Hit
@@ -675,31 +618,7 @@ export async function GET(request: NextRequest) {
         isContextValid ? context : undefined
       );
 
-      // 2. If plural or Latin form, try searching stemmed/singular form
-      if (!wikiResult) {
-        let alternativeTerm = '';
-        if (sanitizedQuery.endsWith('s') && !sanitizedQuery.endsWith('ss')) {
-          alternativeTerm = sanitizedQuery.slice(0, -1);
-        } else if (stemWord(sanitizedQuery) !== sanitizedQuery.toLowerCase()) {
-          const lower = sanitizedQuery.toLowerCase();
-          if (lower === 'bacterium') alternativeTerm = 'bacteria';
-          else if (lower === 'alga') alternativeTerm = 'algae';
-          else if (lower === 'fungus') alternativeTerm = 'fungi';
-          else if (lower === 'protozoon') alternativeTerm = 'protozoa';
-          else alternativeTerm = stemWord(sanitizedQuery);
-        }
-
-        if (alternativeTerm && alternativeTerm !== sanitizedQuery) {
-          wikiResult = await searchWikipedia(signal,
-            alternativeTerm,
-            occurrence,
-            isExcluded,
-            isContextValid ? context : undefined
-          );
-        }
-      }
-
-      // 3. If enriched query was constructed and base search had no lead thumbnail, try enriched query
+      // 2. If enriched query was constructed and base search had no lead thumbnail, try enriched query
       if (!wikiResult && enrichedQuery !== sanitizedQuery) {
         wikiResult = await searchWikipedia(signal,
           enrichedQuery,
@@ -813,7 +732,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       query: cleanQuery,
       status: 'not-found',
-    }, { status: signal.aborted ? (request.signal.aborted ? 499 : 504) : 502 });
+    }, { status: abortStatus(signal, request) });
   } finally {
     activeResolutions--;
   }

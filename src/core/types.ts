@@ -1,5 +1,3 @@
-export type MediaType = 'image' | 'video' | 'gif' | 'lottie';
-
 export interface ResolvedMedia {
   query: string;
   title: string;
@@ -7,28 +5,16 @@ export interface ResolvedMedia {
   thumbnailUrl?: string;
   fullImageUrl?: string;
   sourceUrl?: string;
-  width?: number;
-  height?: number;
   vendor?: 'wikipedia' | 'duckduckgo';
   status: 'loading' | 'loaded' | 'not-found' | 'error';
 }
 
-export type MarkdownToken =
-  | {
-      type: 'text';
-      content: string;
-    }
-  | {
-      type: 'media';
-      raw: string;
-      query: string;
-      mediaType?: MediaType;
-      vendorPreference?: 'wikipedia' | 'duckduckgo' | 'auto';
-      occurrenceIndex?: number;
-      fallbackUrl?: string;
-      id: string;
-      isPartial?: boolean;
-    };
+/** One resolvable image marker found in the prose, for the media sidebar. */
+export interface MediaToken {
+  query: string;
+  vendorPreference: 'wikipedia' | 'duckduckgo' | 'auto';
+  fallbackUrl?: string;
+}
 
 export interface CapsuleSettings {
   height: number; // in pixels, e.g. 24
@@ -36,9 +22,6 @@ export interface CapsuleSettings {
   gap: number; // in pixels, e.g. 6
   verticalOffset: number; // in pixels, e.g. -2
   visualsPerParagraph: number; // target visuals per paragraph, e.g. 3
-  showHoverCard: boolean;
-  hoverScale: boolean;
-  opticalAlignment: 'middle' | 'baseline' | 'center';
 }
 
 export const DEFAULT_CAPSULE_SETTINGS: CapsuleSettings = {
@@ -47,7 +30,4 @@ export const DEFAULT_CAPSULE_SETTINGS: CapsuleSettings = {
   gap: 6,
   verticalOffset: -2,
   visualsPerParagraph: 4,
-  showHoverCard: true,
-  hoverScale: false,
-  opticalAlignment: 'middle',
 };

@@ -4,6 +4,12 @@ export class RequestError extends Error {
   }
 }
 
+/** 499 when the client left, 504 when our own deadline fired, otherwise the error's own status. */
+export function abortStatus(signal: AbortSignal, request: Request, error?: unknown): number {
+  if (signal.aborted) return request.signal.aborted ? 499 : 504;
+  return error instanceof RequestError ? error.status : 502;
+}
+
 /** Also bounds work (DNS/body reads) that does not itself accept an AbortSignal. */
 export async function abortable<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
   if (signal.aborted) {

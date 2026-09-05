@@ -1,7 +1,8 @@
 import { NextRequest } from 'next/server';
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { POST } from './route';
 
+beforeEach(() => { vi.stubEnv('GEMINI_API_KEY', 'fixture-only'); });
 afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); vi.restoreAllMocks(); });
 function request(body: unknown, signal?: AbortSignal) {
   return new NextRequest('http://localhost/api/chat', {
@@ -9,7 +10,7 @@ function request(body: unknown, signal?: AbortSignal) {
   });
 }
 
-it.each([null, { prompt: 'hi', apiKey: 1 }, { prompt: 'hi', model: '../escape' }, { prompt: 'x'.repeat(10001) }])
+it.each([null, { prompt: '   ' }, { prompt: 'hi', model: '../escape' }, { prompt: 'x'.repeat(10001) }])
 ('rejects invalid input without calling Gemini', async (body) => {
   const fetcher = vi.fn(); vi.stubGlobal('fetch', fetcher);
   expect((await POST(request(body))).status).toBe(400);
@@ -30,7 +31,7 @@ it('preserves fragmented UTF-8 SSE text and keeps API keys out of the URL', asyn
     c.close();
   } })));
   vi.stubGlobal('fetch', fetcher);
-  const response = await POST(request({ prompt: 'test', apiKey: 'fixture-only' }));
+  const response = await POST(request({ prompt: 'test' }));
   expect(await response.text()).toBe('🦴 Hello');
   expect(fetcher.mock.calls[0][0]).not.toContain('fixture-only');
   expect(new Headers(fetcher.mock.calls[0][1].headers).get('x-goog-api-key')).toBe('fixture-only');
@@ -42,7 +43,7 @@ it('stops a stalled upstream body after headers arrive', async () => {
   vi.spyOn(AbortSignal, 'timeout').mockReturnValue(deadline.signal);
   let cancelled = false;
   vi.stubGlobal('fetch', vi.fn(async () => new Response(new ReadableStream({ cancel() { cancelled = true; } }))));
-  const response = await POST(request({ prompt: 'test', apiKey: 'fixture-only' }));
+  const response = await POST(request({ prompt: 'test' }));
   const body = response.text();
   deadline.abort(new Error('deadline'));
   await expect(body).rejects.toThrow('deadline');
@@ -52,6 +53,6 @@ it('stops a stalled upstream body after headers arrive', async () => {
 it('does not retry an authentication failure', async () => {
   const fetcher = vi.fn(async () => Response.json({ error: { message: 'Invalid API key' } }, { status: 401 }));
   vi.stubGlobal('fetch', fetcher);
-  expect((await POST(request({ prompt: 'test', apiKey: 'fixture-only' }))).status).toBe(401);
+  expect((await POST(request({ prompt: 'test' }))).status).toBe(401);
   expect(fetcher).toHaveBeenCalledTimes(1);
 });

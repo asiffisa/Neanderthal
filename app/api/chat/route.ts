@@ -1,14 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { readBoundedBody, readJsonObject, RequestError, streamWithLimits } from '../../../src/lib/request-limits';
+import { abortStatus, readBoundedBody, readJsonObject, RequestError, streamWithLimits } from '../../../src/lib/request-limits';
+import { MODEL_PATTERN, modelCandidates, serverApiKey } from '../../../src/lib/gemini';
 
-function buildSystemInstruction(visualsPerParagraph: number = 4, topic: string = ''): string {
+function buildSystemInstruction(visualsPerParagraph: number): string {
   const targetPerPara = Math.max(2, Math.min(4, Math.round(visualsPerParagraph)));
   const minPerPara = Math.max(2, targetPerPara - 1);
   const maxPerPara = Math.min(4, targetPerPara);
-  const entityTopic =
-    topic.length > 35 || topic.includes('?') || topic.split(/\s+/).length > 3
-      ? ''
-      : topic.trim();
 
   return `You are an expert, engaging, multidimensional knowledge educator and essayist.
 Give a clear, compelling, and visually rich explanation in normal Markdown across 2 to 3 structured paragraphs.
@@ -81,7 +78,6 @@ EDITORIAL BALANCE GUIDELINES:
 - Distribute visual capsules smoothly throughout each paragraph (approximately 1 visual every 1-2 sentences) so the entire essay feels consistently illustrated.
 - STRICT SENTENCE SPACING: Never place more than 1 visual capsule in a single sentence. Never tag consecutive nouns.
 - Avoid tagging purely generic metaphors (e.g. tag the literal structure ![Hydrothermal vent](neanderthal:image) rather than ![living internet]).
-- ${entityTopic ? `Primary topic: "${entityTopic}". When referring to movies, roles, artworks, or events related to ${entityTopic}, ALWAYS include ${entityTopic} and the work's title (e.g. ![${entityTopic} in Drishyam film](neanderthal:image?provider=duckduckgo)).` : ''}
 
 EXAMPLE OF A BEAUTIFULLY ILLUSTRATED PARAGRAPH (${targetPerPara} VISUAL CAPSULES):
 "The volcanic architecture of the mid-ocean ridge ![Mid-ocean ridge](neanderthal:image) is sustained by ascending magma that freezes into dense sheeted dikes ![Sheeted dike](neanderthal:image). As the molten basalt cools, newly formed titanomagnetite ![Titanomagnetite](neanderthal:image) grains permanently lock in the orientation of Earth's magnetic field. When chilled by circulating seawater near hydrothermal vents ![Hydrothermal vent](neanderthal:image), these minerals preserve a pristine record of global geomagnetic reversals ![Geomagnetic reversal](neanderthal:image)."
@@ -118,13 +114,10 @@ export async function POST(request: NextRequest) {
   try {
     const body = await readJsonObject(request, signal);
     const prompt = body.prompt;
-    const clientKey = body.apiKey;
-    if ((clientKey !== undefined && (typeof clientKey !== 'string' || clientKey.length > 256)) ||
-        (body.model !== undefined && (typeof body.model !== 'string' || !/^gemini-[a-z0-9.-]{1,70}$/.test(body.model)))) {
-      throw new RequestError('Invalid API key or model', 400);
+    if (body.model !== undefined && (typeof body.model !== 'string' || !MODEL_PATTERN.test(body.model))) {
+      throw new RequestError('Invalid model', 400);
     }
-    const serverKey = process.env.GEMINI_API_KEY || process.env.Gemini || process.env.GEMINI;
-    const apiKey = clientKey?.trim() || serverKey?.trim();
+    const apiKey = serverApiKey();
 
     if (typeof prompt !== 'string' || !prompt.trim() || prompt.length > 10000) {
       return NextResponse.json({ error: 'Prompt must contain between 1 and 10000 characters' }, { status: 400 });
@@ -132,9 +125,7 @@ export async function POST(request: NextRequest) {
 
     if (!apiKey) {
       return NextResponse.json(
-        {
-          error: 'Gemini API key is required. Please provide an API key in the UI settings or configure GEMINI_API_KEY on the server.',
-        },
+        { error: 'Gemini API key is required. Configure GEMINI_API_KEY on the server.' },
         { status: 401 }
       );
     }
@@ -143,20 +134,8 @@ export async function POST(request: NextRequest) {
       typeof body.visualsPerParagraph === 'number' && Number.isFinite(body.visualsPerParagraph) && body.visualsPerParagraph > 0
         ? Math.min(4, Math.max(1, Math.round(body.visualsPerParagraph)))
         : 4;
-    const systemInstructionText = buildSystemInstruction(requestedVisuals, prompt);
-
-    const defaultModel = process.env.GEMINI_MODEL?.trim() || 'gemini-3.5-flash-lite';
-    const requestedModel = typeof body.model === 'string' ? body.model.trim() : defaultModel;
-    const candidateModels = Array.from(
-      new Set([
-        requestedModel,
-        'gemini-3.5-flash-lite',
-        'gemini-3.8-flash',
-        'gemini-3.6-flash',
-        'gemini-2.5-flash',
-        'gemini-1.5-flash',
-      ])
-    );
+    const systemInstructionText = buildSystemInstruction(requestedVisuals);
+    const candidateModels = modelCandidates(body.model);
 
     let geminiRes: Response | null = null;
     let lastErrorText = '';
@@ -302,7 +281,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (err: unknown) {
     console.error('[Chat API Error]:', err);
-    const status = signal.aborted ? (request.signal.aborted ? 499 : 504) : err instanceof RequestError ? err.status : 502;
+    const status = abortStatus(signal, request, err);
     const message = err instanceof RequestError
       ? err.message
       : signal.aborted

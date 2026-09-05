@@ -1,29 +1,27 @@
 import { fromMarkdown } from 'mdast-util-from-markdown';
 import type { Nodes } from 'mdast';
-import { MediaType } from './types';
+import { defaultUrlTransform, type UrlTransform } from 'react-markdown';
+import { MediaToken } from './types';
 
-export const NEANDERTHAL_MEDIA_SCHEME = 'neanderthal:';
+export const NEANDERTHAL_MEDIA_SCHEME = 'neanderthal:image';
 
 export type MediaVendorPreference = 'wikipedia' | 'duckduckgo' | 'auto';
 
 export interface NeanderthalMediaDescriptor {
-  mediaType: MediaType;
   vendorPreference: MediaVendorPreference;
   fallbackUrl?: string;
   isPartial: boolean;
 }
 
-export interface LegacyMediaDescriptor {
-  query: string;
-  vendorPreference: MediaVendorPreference;
-}
-
 interface CreateMediaSourceOptions {
-  mediaType?: MediaType;
   vendorPreference?: MediaVendorPreference;
   fallbackUrl?: string;
   partial?: boolean;
 }
+
+/** react-markdown drops unknown schemes; let our own private one through as an image source. */
+export const safeMarkdownUrl: UrlTransform = (url, key) =>
+  key === 'src' && url.startsWith(NEANDERTHAL_MEDIA_SCHEME) ? url : defaultUrlTransform(url);
 
 const LEGACY_MEDIA_REGEX = /!\[media:([^\]]+)\](?:\(([^)]+)\))?/g;
 
@@ -41,33 +39,11 @@ function normalizeVendor(value?: string | null): MediaVendorPreference {
   return 'auto';
 }
 
-function normalizeMediaType(value?: string | null): MediaType {
-  if (value === 'video' || value === 'gif' || value === 'lottie') {
-    return value;
-  }
-
-  return 'image';
-}
-
-/** Parse the alt text used by the original `![media:Query|vendor]` form. */
-export function parseLegacyMediaAlt(
-  alt?: string | null
-): LegacyMediaDescriptor | null {
-  if (!alt?.startsWith('media:')) {
-    return null;
-  }
-
-  const [rawQuery, rawVendor] = alt.slice('media:'.length).split('|', 2);
+/** Parse the descriptor used by the original `![media:Query|vendor]` form. */
+function parseLegacyMediaAlt(descriptor: string) {
+  const [rawQuery, rawVendor] = descriptor.split('|', 2);
   const query = rawQuery.trim();
-
-  if (!query) {
-    return null;
-  }
-
-  return {
-    query,
-    vendorPreference: normalizeVendor(rawVendor),
-  };
+  return query ? { query, vendorPreference: normalizeVendor(rawVendor) } : null;
 }
 
 function isHttpUrl(value: string): boolean {
@@ -81,7 +57,6 @@ function isHttpUrl(value: string): boolean {
 
 /** Create the destination used by a standard Markdown image node. */
 export function createNeanderthalMediaSource({
-  mediaType = 'image',
   vendorPreference = 'auto',
   fallbackUrl,
   partial = false,
@@ -101,7 +76,7 @@ export function createNeanderthalMediaSource({
   }
 
   const query = params.toString();
-  return `${NEANDERTHAL_MEDIA_SCHEME}${mediaType}${query ? `?${query}` : ''}`;
+  return `${NEANDERTHAL_MEDIA_SCHEME}${query ? `?${query}` : ''}`;
 }
 
 /** Parse a Neanderthal media destination without accepting unrelated URLs. */
@@ -112,13 +87,11 @@ export function parseNeanderthalMediaSource(
     return null;
   }
 
-  const payload = source.slice(NEANDERTHAL_MEDIA_SCHEME.length);
-  const [rawType, rawQuery = ''] = payload.split('?', 2);
+  const [, rawQuery = ''] = source.slice(NEANDERTHAL_MEDIA_SCHEME.length).split('?', 2);
   const params = new URLSearchParams(rawQuery);
   const fallbackCandidate = params.get('fallback');
 
   return {
-    mediaType: normalizeMediaType(rawType),
     vendorPreference: normalizeVendor(params.get('provider')),
     fallbackUrl:
       fallbackCandidate && isHttpUrl(fallbackCandidate) ? fallbackCandidate : undefined,
@@ -167,7 +140,7 @@ export function normalizeLegacyMediaMarkdown(markdown: string): string {
   const literals = literalRanges(markdown);
   return markdown.replace(LEGACY_MEDIA_REGEX, (match, rawDescriptor, fallbackUrl, offset) => {
     if (isEscaped(markdown, offset) || literals.some(([start, end]) => offset >= start && offset < end)) return match;
-    const descriptor = parseLegacyMediaAlt(`media:${String(rawDescriptor)}`);
+    const descriptor = parseLegacyMediaAlt(String(rawDescriptor));
     if (!descriptor) return match;
     return createNeanderthalMediaMarkdown(descriptor.query, {
       vendorPreference: descriptor.vendorPreference,
@@ -240,9 +213,20 @@ function rewriteMediaProse(markdown: string, isStreaming: boolean): string {
   return markdown;
 }
 
-/** Repair omitted nouns only on actual Markdown image nodes, never inside code. */
-export function ensureTextAccompaniesPills(markdown: string): string {
-  return rewriteMediaProse(markdown, false);
+/** Collect the resolvable markers in order; code, escaped examples and ordinary images are skipped. */
+export function collectMediaTokens(markdown: string): MediaToken[] {
+  const tokens: MediaToken[] = [];
+  visitMarkdown(normalizeLegacyMediaMarkdown(markdown), (node) => {
+    if (node.type !== 'image') return;
+    const descriptor = parseNeanderthalMediaSource(node.url);
+    if (!descriptor) return;
+    tokens.push({
+      query: node.alt?.trim() || '',
+      vendorPreference: descriptor.vendorPreference,
+      fallbackUrl: descriptor.fallbackUrl,
+    });
+  });
+  return tokens;
 }
 
 /** Unfinished prose images become non-resolving placeholders during a stream. */

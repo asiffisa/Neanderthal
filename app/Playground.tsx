@@ -13,48 +13,29 @@ import { DEFAULT_PRESET, PresetQuestion } from '../src/lib/presets';
 import {
   CapsuleSettings,
   DEFAULT_CAPSULE_SETTINGS,
-  MarkdownToken,
   ResolvedMedia,
 } from '../src/core/types';
-import { tokenizeStreamingMarkdown } from '../src/core/tokenizer';
-import { createNeanderthalMediaMarkdown } from '../src/core/media-markdown';
+import { collectMediaTokens, createNeanderthalMediaMarkdown } from '../src/core/media-markdown';
+import { modelLabel } from '../src/lib/gemini';
 import { resolveMedia } from '../src/lib/wikimedia';
 import { StreamingMarkdownView } from '../src/components/StreamingMarkdownView';
 import { MediaLightbox } from '../src/components/MediaLightbox';
 
-function getModelShortLabel(id: string): string {
-  if (id === 'gemini-3.8-flash') return 'Gemini 3.8';
-  if (id === 'gemini-3.6-flash') return 'Gemini 3.6';
-  if (id === 'gemini-3.5-flash-lite') return 'Gemini 3.5 Lite';
-  if (id === 'gemini-2.5-flash') return 'Gemini 2.5';
-  if (id === 'gemini-1.5-flash') return 'Gemini 1.5';
-  return 'Gemini';
-}
-
-function getModelFullLabel(id: string): string {
-  if (id === 'gemini-3.8-flash') return 'Gemini 3.8 Flash';
-  if (id === 'gemini-3.6-flash') return 'Gemini 3.6 Flash';
-  if (id === 'gemini-3.5-flash-lite') return 'Gemini 3.5 Flash Lite';
-  if (id === 'gemini-2.5-flash') return 'Gemini 2.5 Flash';
-  if (id === 'gemini-1.5-flash') return 'Gemini 1.5 Flash';
-  return 'Gemini Flash';
-}
-
 const STREAM_SPEED_MS = 14;
 
 interface PlaygroundProps {
-  hasInitialServerKey?: boolean;
+  /** Both come from the server component; the browser never has to ask for them. */
+  hasServerKey?: boolean;
+  model?: string;
 }
 
-export default function Playground({ hasInitialServerKey = false }: PlaygroundProps) {
+export default function Playground({ hasServerKey = false, model = 'gemini-3.5-flash-lite' }: PlaygroundProps) {
   // Preset & Input state
   const [selectedPreset, setSelectedPreset] = useState<PresetQuestion>(DEFAULT_PRESET);
   const [customInput, setCustomInput] = useState('');
 
   // Gemini AI Server Key & Model state
-  const [hasServerKey, setHasServerKey] = useState<boolean>(hasInitialServerKey);
-  const [selectedModel, setSelectedModel] = useState<string>('gemini-3.5-flash-lite');
-  const isKeyActive = Boolean(hasServerKey);
+  const isKeyActive = hasServerKey;
   const [isLiveGenerating, setIsLiveGenerating] = useState<boolean>(false);
   const [apiError, setApiError] = useState<string | null>(null);
   const [isShuffling, setIsShuffling] = useState<boolean>(false);
@@ -74,21 +55,6 @@ export default function Playground({ hasInitialServerKey = false }: PlaygroundPr
   const streamTimerRef = useRef<NodeJS.Timeout | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const streamContainerRef = useRef<HTMLDivElement | null>(null);
-
-  // Synchronize server key availability and active model dynamically
-  useEffect(() => {
-    fetch('/api/key-status')
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (data && typeof data.hasServerKey === 'boolean') {
-          setHasServerKey(data.hasServerKey);
-        }
-        if (data && typeof data.model === 'string' && data.model) {
-          setSelectedModel(data.model);
-        }
-      })
-      .catch(() => {});
-  }, []);
 
   // Auto-start initial preset stream on mount only
   useEffect(() => {
@@ -156,12 +122,12 @@ export default function Playground({ hasInitialServerKey = false }: PlaygroundPr
       streamContainerRef.current.scrollTop = 0;
     }
 
-    const modelLabel = getModelShortLabel(selectedModel);
+    const shortLabel = modelLabel(model, true);
 
     setSelectedPreset({
       id: 'live-' + Date.now(),
       title,
-      category: category || modelLabel,
+      category: category || shortLabel,
       icon,
       prompt: promptText,
       response: '',
@@ -173,7 +139,7 @@ export default function Playground({ hasInitialServerKey = false }: PlaygroundPr
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           prompt: promptText,
-          model: selectedModel,
+          model,
           visualsPerParagraph: Math.min(4, Math.max(1, capsuleSettings.visualsPerParagraph ?? 4)),
         }),
         signal: controller.signal,
@@ -237,7 +203,7 @@ export default function Playground({ hasInitialServerKey = false }: PlaygroundPr
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: selectedModel,
+          model,
           excludeTitles: recentTitles,
         }),
       });
@@ -307,14 +273,8 @@ export default function Playground({ hasInitialServerKey = false }: PlaygroundPr
   };
 
 
-  // Memoize tokens to prevent redundant regex parsing on unrelated state changes
-  const activeTokens: MarkdownToken[] = useMemo(() => {
-    return tokenizeStreamingMarkdown(streamedText, isStreaming);
-  }, [streamedText, isStreaming]);
-
-  const mediaTokens = useMemo(() => {
-    return activeTokens.filter((t) => t.type === 'media');
-  }, [activeTokens]);
+  // Only the media markers feed the sidebar, and only the finished text can produce them.
+  const mediaTokens = useMemo(() => collectMediaTokens(streamedText), [streamedText]);
 
   const activeEntityContext = useMemo(() => {
     // Only pass context if it is a concise entity name (<= 3 words, no question marks, not a full sentence)
@@ -415,7 +375,7 @@ export default function Playground({ hasInitialServerKey = false }: PlaygroundPr
               {isLiveGenerating && !streamedText && (
                 <div className="flex items-center text-xs text-zinc-400 py-12 justify-center animate-pulse">
                   <span>
-                    {getModelFullLabel(selectedModel)} is
+                    {modelLabel(model)} is
                     generating insights with visual capsules...
                   </span>
                 </div>

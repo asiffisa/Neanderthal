@@ -10,7 +10,7 @@ The playground is a reference application. The reusable part is the Markdown ren
 | Display capsules | Those core files, the three components, and the browser helpers listed below | React, Tailwind CSS, and an image resolver |
 | Run the playground | Clone the repository | Next.js and the npm lockfile |
 
-For a first experiment, run the repository locally and import [the example](../examples/InlineMediaExample.tsx) in your own page. It is not mounted in the existing playground.
+For a first experiment, run the repository locally and import [the example](../README.md#use-it-in-your-app) in your own page. It is not mounted in the existing playground.
 
 ## 2. Copy the renderer
 
@@ -32,7 +32,7 @@ src/neanderthal/
     request-limits.ts
 ```
 
-Retain the MIT license notice with copied source. You do not need the playground page, presets, tokenizer, or Gemini routes. `tokenizer.ts` is used by the playground's media panel, not by the React Markdown renderer.
+Retain the MIT license notice with copied source. You do not need the playground page, presets, or Gemini routes. `collectMediaTokens` in `media-markdown.ts` is used by the playground's media panel, not by the React Markdown renderer.
 
 In an existing React 19 application, install the renderer dependencies:
 
@@ -120,7 +120,7 @@ The supplied API routes require a server, not a static-only deployment. A React 
 
 ## 5. Render and inspect
 
-Copy [InlineMediaExample.tsx](../examples/InlineMediaExample.tsx), updating its source imports to your copied directory. Then render:
+Copy [InlineMediaExample.tsx](../README.md#use-it-in-your-app), updating its source imports to your copied directory. Then render:
 
 ```tsx
 <InlineMediaExample
@@ -176,4 +176,4 @@ Ordinary links use `react-markdown`'s URL filter. Do not add raw HTML rendering 
 | Environment key alone gives no live answer | Current UI branches on its browser-saved key |
 | Preview has no extra resolution | The demo returns the same thumbnail and full-image URL |
 
-Code examples, duplicate image claims, fallback caching, and browser cache growth now have regression coverage. Modal keyboard accessibility, deployment access controls, and the dependency advisory remain release work. Read the [release findings](PRODUCTION_REVIEW.md) before production use. The example is type-checked against this repository; a clean external-app integration and published package are not yet verified.
+Code examples, duplicate image claims, fallback caching, and browser cache growth have regression coverage. Modal keyboard accessibility and deployment access controls remain release work. The example is type-checked against this repository; a clean external-app integration and published package are not yet verified.

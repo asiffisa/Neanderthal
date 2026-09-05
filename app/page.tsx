@@ -2,8 +2,9 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import Image from 'next/image';
 import Playground from './Playground';
-import { EssayMarkdown } from '../src/components/EssayMarkdown';
+import { EssayLightbox, EssayMarkdown } from '../src/components/EssayMarkdown';
 import { HeaderLottie } from '../src/components/HeaderLottie';
+import { defaultModel, serverApiKey } from '../src/lib/gemini';
 import styles from './essay.module.css';
 
 const playgroundHeading = 'Put the picture where the meaning happens';
@@ -75,6 +76,7 @@ export default async function EssayPage() {
     <div className="min-h-screen bg-[#090a0c] px-5 text-zinc-100 md:px-8">
       <div className={styles.page}>
         <main>
+          <EssayLightbox>
           <article>
             <figure className={styles.coverImage}>
               <Image
@@ -108,19 +110,14 @@ export default async function EssayPage() {
                   )}
                   {heading === playgroundHeading && (
                     <section id="playground" aria-label="Neanderthal playground" className={styles.playground}>
-                      <Playground
-                        hasInitialServerKey={Boolean(
-                          process.env.GEMINI_API_KEY?.trim() ||
-                          process.env.Gemini?.trim() ||
-                          process.env.GEMINI?.trim()
-                        )}
-                      />
+                      <Playground hasServerKey={Boolean(serverApiKey())} model={defaultModel()} />
                     </section>
                   )}
                 </section>
               );
             })}
           </article>
+          </EssayLightbox>
         </main>
 
         <footer className={styles.footer}>

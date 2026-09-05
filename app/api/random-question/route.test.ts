@@ -1,14 +1,15 @@
 import { NextRequest } from 'next/server';
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { POST } from './route';
 
+beforeEach(() => { vi.stubEnv('GEMINI_API_KEY', 'fixture-only'); });
 afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 const request = (body: unknown) => new NextRequest('http://localhost/api/random-question', { method: 'POST', body: JSON.stringify(body) });
 
 it.each([401, 403, 429, 500])('does not multiply provider calls after HTTP %i', async (status) => {
   const fetcher = vi.fn(async (_url: string, _options: RequestInit) => new Response('{}', { status }));
   vi.stubGlobal('fetch', fetcher);
-  const response = await POST(request({ apiKey: 'fixture-only' }));
+  const response = await POST(request({}));
   expect((await response.json()).source).toBe('curated-bank');
   expect(fetcher).toHaveBeenCalledTimes(1);
   const options = fetcher.mock.calls[0][1];
@@ -21,13 +22,15 @@ it('still tries the next model when the requested model is unavailable', async (
     candidates: [{ content: { parts: [{ text: JSON.stringify({ title: 'Test subject', prompt: 'How does it work?' }) }] } }],
   }));
   vi.stubGlobal('fetch', fetcher);
-  const response = await POST(request({ apiKey: 'fixture-only' }));
+  const response = await POST(request({}));
   expect((await response.json()).title).toBe('Test subject');
   expect(fetcher).toHaveBeenCalledTimes(2);
 });
 
 it('keeps no-key shuffle available without a provider request', async () => {
   vi.stubEnv('GEMINI_API_KEY', '');
+  vi.stubEnv('Gemini', '');
+  vi.stubEnv('GEMINI', '');
   const fetcher = vi.fn(); vi.stubGlobal('fetch', fetcher);
   expect((await (await POST(request({}))).json()).source).toBe('curated-bank');
   expect(fetcher).not.toHaveBeenCalled();

@@ -26,8 +26,8 @@ This is a Next.js playground demonstrating the renderer. Copy the source into yo
 Node 22 or 24, verified on 24.11.1.
 
 ```bash
-npm ci
-npm run dev -- --hostname 127.0.0.1
+pnpm install
+pnpm dev -- --hostname 127.0.0.1
 ```
 
 Open [localhost:3000](http://localhost:3000). An answer streams in on load. Hover a capsule for a preview, click it to inspect, use the Craft controls to change capsule size and alignment, or paste your own Markdown into the input. None of that needs an API key; image search needs an internet connection.
@@ -45,12 +45,12 @@ cp .env.example .env.local   # then fill in GEMINI_API_KEY
 ### Checks
 
 ```bash
-npm test
-npm exec tsc -- --noEmit
-npm run build
+pnpm test
+pnpm exec tsc --noEmit
+pnpm build
 ```
 
-`npm run lint` still prompts for ESLint setup; it is not a validation gate yet.
+`pnpm lint` still prompts for ESLint setup; it is not a validation gate yet.
 
 ## Markdown syntax
 
@@ -64,7 +64,7 @@ npm run build
 
 Name the subject in the sentence, then put its capsule after it, so the prose still reads if the image fails. `createNeanderthalMediaMarkdown` in `src/core/media-markdown.ts` generates markers and encodes fallback URLs.
 
-Only images render today. The media types declare video and Lottie, but nothing plays them.
+Only images render today.
 
 ## Use it in your app
 
@@ -80,7 +80,7 @@ import { DEFAULT_CAPSULE_SETTINGS } from './src/core/types';
 />
 ```
 
-Requires Tailwind CSS and `/api/resolve` on the same origin. Add `onInspect` and `MediaLightbox` for click-to-inspect. Details in the [integration guide](docs/INTEGRATION.md) and the [React example](examples/InlineMediaExample.tsx).
+Requires Tailwind CSS and `/api/resolve` on the same origin. Add `onInspect` and `MediaLightbox` for click-to-inspect. Details in the [integration guide](docs/INTEGRATION.md).
 
 ## Layout
 
@@ -91,9 +91,9 @@ Markdown or AI stream -> StreamingMarkdownView -> InlineCapsule -> /api/resolve 
 
 | Path | What it does |
 | --- | --- |
-| `src/core/` | Types, marker helpers, legacy tokenizer |
+| `src/core/` | Types and marker helpers |
 | `src/components/` | Renderer, capsules, lightbox |
-| `src/lib/` | Resolver client, request dedup, caches, proxy fetch |
+| `src/lib/` | Resolver client, request dedup, caches, proxy fetch, Gemini config |
 | `app/api/resolve/` | Image search and metadata cache |
 | `app/api/media-proxy/` | Image delivery and buffer cache |
 | `app/api/chat/`, `app/api/random-question/` | Optional Gemini features |
@@ -105,7 +105,7 @@ The proxy fetches only approved HTTPS hosts, pins public DNS addresses, rejects 
 
 Run the checks above and keep changes focused. For renderer or API changes, add regression coverage and check partial streams, failed image requests, mobile layout, and keyboard interaction. Never commit keys or `.env.local`.
 
-[docs/PRODUCTION_REVIEW.md](docs/PRODUCTION_REVIEW.md) is the release checklist. A green build is not release approval.
+A green build is not release approval: the API routes still have no auth or rate limiting.
 
 ## License
 

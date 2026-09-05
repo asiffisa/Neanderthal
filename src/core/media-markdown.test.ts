@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  collectMediaTokens,
   createNeanderthalMediaMarkdown,
   createNeanderthalMediaSource,
   normalizeLegacyMediaMarkdown,
@@ -41,7 +42,6 @@ describe('Neanderthal Markdown contract', () => {
     });
 
     expect(parseNeanderthalMediaSource(source)).toEqual({
-      mediaType: 'image',
       vendorPreference: 'wikipedia',
       fallbackUrl: 'https://example.com/skull.jpg',
       isPartial: false,
@@ -55,7 +55,6 @@ describe('Neanderthal Markdown contract', () => {
         'neanderthal:image?fallback=javascript%3Aalert%281%29'
       )
     ).toEqual({
-      mediaType: 'image',
       vendorPreference: 'auto',
       fallbackUrl: undefined,
       isPartial: false,
@@ -100,5 +99,42 @@ describe('Neanderthal Markdown contract', () => {
     expect(prepareNeanderthalMarkdown(spaced, false)).toBe(
       'The perivascular space ![Perivascular space](neanderthal:image). Simultaneously, delta waves ![Delta waves](neanderthal:image), synchronize.'
     );
+  });
+});
+
+describe('collectMediaTokens', () => {
+  it('does not collect code or escaped examples as media', () => {
+    expect(
+      collectMediaTokens(
+        '`![Code](neanderthal:image)` and \\![Escaped](neanderthal:image).\n\n```md\n![Fenced](neanderthal:image)\n```'
+      )
+    ).toEqual([]);
+  });
+
+  it('parses escaped brackets in descriptions consistently with Markdown', () => {
+    expect(collectMediaTokens('![A \\[specimen\\]](neanderthal:image)')).toEqual([
+      { query: 'A [specimen]', vendorPreference: 'auto', fallbackUrl: undefined },
+    ]);
+  });
+
+  it('collects the public media syntax in reading order', () => {
+    expect(
+      collectMediaTokens(
+        'Before ![Neanderthal skull](neanderthal:image) then ![Mantis shrimp](neanderthal:image?provider=duckduckgo) after.'
+      )
+    ).toMatchObject([
+      { query: 'Neanderthal skull', vendorPreference: 'auto' },
+      { query: 'Mantis shrimp', vendorPreference: 'duckduckgo' },
+    ]);
+  });
+
+  it('ignores ordinary Markdown images meant for the real renderer', () => {
+    expect(collectMediaTokens('![Alt text](https://example.com/image.jpg)')).toEqual([]);
+  });
+
+  it('continues to recognize legacy tokens during migration', () => {
+    expect(collectMediaTokens('![media:Chloroplast|wiki]')).toMatchObject([
+      { query: 'Chloroplast', vendorPreference: 'wikipedia' },
+    ]);
   });
 });

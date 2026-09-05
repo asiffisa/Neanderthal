@@ -19,5 +19,3 @@ Survival in the oceanic abyss relies heavily on optical deception. The deep sea 
 
 Meanwhile, the vampire squid ![Vampire squid](neanderthal:image) expels an astonishing cloud of glowing bioluminescent mucus to blind predators in the blackness. Further along the seabed, benthic creatures drift past abyssal hydrothermal vents ![Hydrothermal vent](neanderthal:image), where giant tubeworms thrive on volcanic minerals.`,
 };
-
-export const PRESETS: PresetQuestion[] = [DEFAULT_PRESET];

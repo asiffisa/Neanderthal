@@ -1,4 +1,5 @@
-import { fetchWithLimits, readJsonObject, RequestError } from '../../../src/lib/request-limits';
+import { abortStatus, fetchWithLimits, readJsonObject, RequestError } from '../../../src/lib/request-limits';
+import { MODEL_PATTERN, modelCandidates, serverApiKey } from '../../../src/lib/gemini';
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "node:crypto";
 
@@ -209,10 +210,8 @@ export async function POST(request: NextRequest) {
   const signal = AbortSignal.any([request.signal, AbortSignal.timeout(15000)]);
   try {
     const body = await readJsonObject(request, signal);
-    const clientKey = body.apiKey;
     if (
-      (clientKey !== undefined && (typeof clientKey !== 'string' || clientKey.length > 256)) ||
-      (body.model !== undefined && (typeof body.model !== 'string' || !/^gemini-[a-z0-9.-]{1,70}$/.test(body.model))) ||
+      (body.model !== undefined && (typeof body.model !== 'string' || !MODEL_PATTERN.test(body.model))) ||
       (body.excludeTitles !== undefined &&
         (!Array.isArray(body.excludeTitles) ||
           body.excludeTitles.length > 35 ||
@@ -220,26 +219,14 @@ export async function POST(request: NextRequest) {
     ) {
       throw new RequestError('Invalid shuffle parameters', 400);
     }
-    const serverKey = process.env.GEMINI_API_KEY || process.env.Gemini || process.env.GEMINI;
-    const apiKey = clientKey?.trim() || serverKey?.trim();
+    const apiKey = serverApiKey();
     const excludeTitles: string[] = Array.isArray(body.excludeTitles) ? body.excludeTitles : [];
 
     const entropySeed = generateAlphanumericSeed(48);
 
     // If API key is available, query Gemini LLM to invent an intuitive, curious question
     if (apiKey) {
-      const defaultModel = process.env.GEMINI_MODEL?.trim() || "gemini-3.5-flash-lite";
-      const requestedModel = typeof body.model === "string" ? body.model.trim() : defaultModel;
-      const candidateModels = Array.from(
-        new Set([
-          requestedModel,
-          "gemini-3.5-flash-lite",
-          "gemini-3.8-flash",
-          "gemini-3.6-flash",
-          "gemini-2.5-flash",
-          "gemini-1.5-flash",
-        ])
-      );
+      const candidateModels = modelCandidates(body.model);
 
       const promptDirective = `You are a curious, accessible scientific mystery generator.
 Generate 1 simple, wondrous, everyday natural or scientific mystery that anyone would be curious to ask (for example: "Why is the sky blue?", "What causes sea tides?", "Why does ice float?", "How do chameleons change color?").
@@ -341,9 +328,7 @@ You MUST return ONLY a valid JSON object matching this schema:
     if (err instanceof RequestError || signal.aborted) {
       return NextResponse.json(
         { error: err instanceof RequestError ? err.message : "Shuffle cancelled or timed out" },
-        {
-          status: signal.aborted ? (request.signal.aborted ? 499 : 504) : (err as RequestError).status,
-        }
+        { status: abortStatus(signal, request, err) }
       );
     }
     const randomIndex = crypto.randomInt(0, CURATED_QUESTIONS.length);

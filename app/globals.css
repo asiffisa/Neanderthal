@@ -3,15 +3,7 @@
 @layer base {
   :root {
     --bg-primary: #090a0b;
-    --bg-secondary: #121417;
-    --bg-tertiary: #181b20;
-    --border-subtle: rgba(255, 255, 255, 0.08);
-    --border-hover: rgba(255, 255, 255, 0.18);
     --text-primary: #f3f4f6;
-    --text-secondary: #9ca3af;
-    --text-muted: #6b7280;
-    --accent-amber: #f59e0b;
-    --accent-glow: rgba(245, 158, 11, 0.15);
   }
 
   body {
@@ -45,6 +37,45 @@
   );
   background-size: 200% 100%;
   animation: shimmer 1.8s infinite linear;
+}
+
+/* Capsule press feedback and popover/lightbox entry, replacing a motion library.
+   The offset comes in as a custom property so the press scale can compose with it. */
+.capsule {
+  transform: translateY(var(--capsule-offset, 0px));
+}
+.capsule:active {
+  transform: translateY(var(--capsule-offset, 0px)) scale(0.96);
+}
+
+/* The resting state lives on the class, not in a `to` frame, so the element is still visible
+   and correctly placed if the animation is disabled, throttled or never runs. */
+@keyframes fade-in {
+  from { opacity: 0; }
+}
+
+@keyframes rise-in {
+  from { opacity: 0; transform: translate(-50%, var(--rise-from, 6px)) scale(0.96); }
+}
+
+@keyframes zoom-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.95); }
+}
+
+.animate-fade-in { animation: fade-in 180ms ease-out; }
+.animate-rise-in { transform: translateX(-50%); animation: rise-in 200ms cubic-bezier(0.16, 1, 0.3, 1); }
+.animate-zoom-in { animation: zoom-in 200ms cubic-bezier(0.16, 1, 0.3, 1); }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in,
+  .animate-rise-in,
+  .animate-zoom-in,
+  .animate-shimmer {
+    animation: none;
+  }
+  .capsule:active {
+    transform: translateY(var(--capsule-offset, 0px));
+  }
 }
 
 /* Custom scrollbar */

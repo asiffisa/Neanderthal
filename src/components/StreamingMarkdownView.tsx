@@ -1,17 +1,13 @@
 'use client';
 
 import React, { createContext, memo, useContext, useEffect, useMemo, useRef } from 'react';
-import Markdown, {
-  defaultUrlTransform,
-  type Components,
-  type UrlTransform,
-} from 'react-markdown';
+import Markdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { CapsuleSettings, ResolvedMedia } from '../core/types';
 import {
-  NEANDERTHAL_MEDIA_SCHEME,
   parseNeanderthalMediaSource,
   prepareNeanderthalMarkdown,
+  safeMarkdownUrl,
 } from '../core/media-markdown';
 import { InlineCapsule } from './InlineCapsule';
 
@@ -25,14 +21,6 @@ interface StreamingMarkdownViewProps {
 }
 
 const remarkPlugins = [remarkGfm];
-
-const safeMarkdownUrl: UrlTransform = (url, key) => {
-  if (key === 'src' && url.startsWith(NEANDERTHAL_MEDIA_SCHEME)) {
-    return url;
-  }
-
-  return defaultUrlTransform(url);
-};
 
 interface MarkdownRenderContextValue {
   settings: CapsuleSettings;
@@ -208,3 +196,5 @@ export const StreamingMarkdownView: React.FC<StreamingMarkdownViewProps> = memo(
     </div>
   );
 });
+
+StreamingMarkdownView.displayName = 'StreamingMarkdownView';

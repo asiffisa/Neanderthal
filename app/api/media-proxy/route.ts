@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { BoundedCache } from '../../../src/lib/bounded-cache';
 import { parseImageProxyUrl } from '../../../src/lib/media-url';
 import { fetchProxyImage } from '../../../src/lib/proxy-image';
-import { RequestError } from '../../../src/lib/request-limits';
+import { abortStatus } from '../../../src/lib/request-limits';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
     cache.set(url.href, image, image.buffer.byteLength);
     return new Response(image.buffer, { headers: { ...headers, 'Content-Type': image.contentType, 'X-Proxy-Cache': 'MISS' } });
   } catch (error) {
-    const status = signal.aborted ? (request.signal.aborted ? 499 : 504) : error instanceof RequestError ? error.status : 502;
+    const status = abortStatus(signal, request, error);
     return NextResponse.json({ error: status === 504 ? 'Image request timed out' : 'Image unavailable' }, { status, headers: { 'Cache-Control': 'no-store' } });
   } finally {
     activeRequests--;

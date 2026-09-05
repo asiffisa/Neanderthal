@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { createPortal } from 'react-dom';
-import { motion } from 'framer-motion';
 import { ExternalLink, Maximize2, Sparkles } from 'lucide-react';
 import { CapsuleSettings, ResolvedMedia } from '../core/types';
 import { mediaFallback, resolveMedia, resolveUniqueMedia } from '../lib/wikimedia';
@@ -16,7 +15,6 @@ interface InlineCapsuleProps {
   settings: CapsuleSettings;
   onInspect?: (media: ResolvedMedia) => void;
   id?: string;
-  occurrenceIndex?: number;
   claimedUrlsRef?: React.MutableRefObject<Map<string, string>>;
   context?: string;
 }
@@ -33,7 +31,6 @@ export const InlineCapsule: React.FC<InlineCapsuleProps> = memo(({
   settings,
   onInspect,
   id,
-  occurrenceIndex = 0,
   claimedUrlsRef,
   context,
 }) => {
@@ -86,7 +83,7 @@ export const InlineCapsule: React.FC<InlineCapsuleProps> = memo(({
     async function loadUniqueMedia() {
       try {
         const resolve = (excluded: string[], attempt: number) => resolveMedia(
-          query, fallbackUrl, vendorPreference, excluded, occurrenceIndex + attempt, context, controller.signal
+          query, fallbackUrl, vendorPreference, excluded, attempt, context, controller.signal
         );
         const result = claimedUrlsRef
           ? await resolveUniqueMedia(resolve, claimedUrlsRef.current, capsuleKey, controller.signal)
@@ -102,7 +99,7 @@ export const InlineCapsule: React.FC<InlineCapsuleProps> = memo(({
       controller.abort();
       claimedUrlsRef?.current.delete(capsuleKey);
     };
-  }, [query, fallbackUrl, vendorPreference, isPartial, occurrenceIndex, id, claimedUrlsRef, context]);
+  }, [query, fallbackUrl, vendorPreference, isPartial, id, claimedUrlsRef, context]);
 
   const updatePopoverPosition = useCallback(() => {
     if (!capsuleRef.current) return;
@@ -141,7 +138,6 @@ export const InlineCapsule: React.FC<InlineCapsuleProps> = memo(({
       clearTimeout(closeTimeoutRef.current);
       closeTimeoutRef.current = null;
     }
-    if (!settings.showHoverCard) return;
     updatePopoverPosition();
     hoverTimeoutRef.current = setTimeout(() => {
       setIsHovered(true);
@@ -229,8 +225,8 @@ export const InlineCapsule: React.FC<InlineCapsuleProps> = memo(({
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
-    verticalAlign: settings.opticalAlignment,
-    transform: `translateY(${settings.verticalOffset}px)`,
+    verticalAlign: 'middle',
+    ['--capsule-offset' as string]: `${settings.verticalOffset}px`,
     marginLeft: `${settings.gap / 2}px`,
     marginRight: 0,
     height: `${capsuleHeight}px`,
@@ -250,16 +246,13 @@ export const InlineCapsule: React.FC<InlineCapsuleProps> = memo(({
         onPointerEnter={handlePointerEnter}
         onMouseLeave={handleMouseLeave}
       >
-        <motion.button
+        <button
           type="button"
           style={containerStyle}
-          whileHover={settings.hoverScale ? { scale: 1.06 } : undefined}
-          whileTap={{ scale: 0.96 }}
-          transition={{ type: 'spring', stiffness: 450, damping: 28 }}
           onClick={handleInspect}
           aria-label={media.title || query}
           title={media.title || query}
-          className={`group relative overflow-hidden transition-all duration-200 border ${
+          className={`capsule group relative overflow-hidden transition-all duration-200 border ${
             isLoading
               ? 'border-white/10 bg-white/5'
               : hasImage
@@ -299,28 +292,24 @@ export const InlineCapsule: React.FC<InlineCapsuleProps> = memo(({
               <span className="absolute inset-0 bg-black/5 group-hover:bg-transparent transition-colors" />
             </>
           )}
-        </motion.button>
+        </button>
       </span>
 
       {/* Portal-Mounted Hover Popover Card (Root-level Stacking Context, z-[99999]) */}
       {mounted && isHovered && popoverCoords && media.status === 'loaded' && typeof document !== 'undefined' &&
         createPortal(
-          <motion.div
+          <div
             key={`popover-${media.query}-${popoverCoords.placeBelow ? 'below' : 'above'}`}
-            initial={{ opacity: 0, y: popoverCoords.placeBelow ? -6 : 6, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: popoverCoords.placeBelow ? -6 : 6, scale: 0.96 }}
-            transition={{ type: 'spring', stiffness: 450, damping: 26 }}
             style={{
               position: 'fixed',
               top: popoverCoords.placeBelow ? `${popoverCoords.top}px` : 'auto',
               bottom: !popoverCoords.placeBelow ? `${popoverCoords.bottom}px` : 'auto',
               left: `${popoverCoords.left}px`,
-              x: '-50%',
+              ['--rise-from' as string]: popoverCoords.placeBelow ? '-6px' : '6px',
               maxHeight: `${popoverCoords.maxHeight}px`,
               zIndex: 99999,
             }}
-            className="w-72 p-3 rounded-xl bg-[#14161a] border border-white/20 shadow-2xl backdrop-blur-2xl pointer-events-auto text-left overflow-y-auto"
+            className="animate-rise-in w-72 p-3 rounded-xl bg-[#14161a] border border-white/20 shadow-2xl backdrop-blur-2xl pointer-events-auto text-left overflow-y-auto"
             onMouseEnter={() => {
               if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
               if (closeTimeoutRef.current) {
@@ -391,9 +380,11 @@ export const InlineCapsule: React.FC<InlineCapsuleProps> = memo(({
                 </a>
               )}
             </div>
-          </motion.div>,
+          </div>,
           document.body
         )}
     </>
   );
 });
+
+InlineCapsule.displayName = 'InlineCapsule';
