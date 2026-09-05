@@ -9,12 +9,21 @@ const USER_AGENT =
   process.env.USER_AGENT ||
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 NeanderthalApp/1.0 (https://github.com/asiffisa/Neanderthal)';
 
-// Words that represent generic shapes, portions, or trivial conversational nouns that should never resolve to media
+// Words that represent generic shapes, portions, metrics, or non-visual sensations that should never resolve to media
 const TRIVIAL_DISALLOWED_TERMS = new Set([
+  // Geometric divisions & portions
   'slice', 'slices', 'portion', 'portions', 'piece', 'pieces', 'chunk', 'chunks',
   'part', 'parts', 'side', 'sides', 'surface', 'surfaces', 'layer', 'layers',
-  'exterior', 'interior', 'amount', 'amounts', 'fraction', 'fractions'
+  'exterior', 'interior', 'amount', 'amounts', 'fraction', 'fractions',
+  'zone', 'zones', 'area', 'areas', 'section', 'sections', 'segment', 'segments',
+  // Intangible sensations
+  'smell', 'smells', 'scent', 'scents', 'fragrance', 'fragrances', 'aroma', 'aromas',
+  'flavor', 'flavors', 'taste', 'tastes', 'odor', 'odors',
+  // Abstract metrics & dimensions
+  'temperature', 'temperatures', 'degree', 'degrees', 'speed', 'speeds', 'velocity',
+  'rate', 'rates', 'mass', 'volume', 'energy'
 ]);
+
 
 // Stop-words and descriptive adjectives to strip when simplifying complex phrases
 const STOP_WORDS = new Set([

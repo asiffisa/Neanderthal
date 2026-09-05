@@ -101,3 +101,20 @@ it('searches canonical scientific term directly without appending context, resol
   expect(fetchMock).toHaveBeenCalledTimes(1);
 });
 
+it('immediately rejects trivial divisions, metrics, and sensations without invoking fetch', async () => {
+  const fetchMock = vi.fn();
+  vi.stubGlobal('fetch', fetchMock);
+  const { GET } = await import('./route');
+
+  const termsToTest = ['slice', 'Slice', 'surface', 'temperature', 'smell', 'portion', 'layer'];
+  for (const term of termsToTest) {
+    const res = await GET(new NextRequest(`http://localhost/api/resolve?q=${encodeURIComponent(term)}`));
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.status).toBe('not-found');
+    expect(data.thumbnailUrl).toBeNull();
+  }
+
+  expect(fetchMock).not.toHaveBeenCalled();
+});
+
