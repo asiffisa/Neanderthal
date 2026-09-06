@@ -8,9 +8,9 @@ The playground is a reference application. The reusable part is the Markdown ren
 | --- | --- | --- |
 | Generate marker strings | `src/core/types.ts`, `src/core/media-markdown.ts` | TypeScript, `mdast-util-from-markdown`, `@types/mdast`; no React or AI key |
 | Display capsules | Those core files, the three components, and the browser helpers listed below | React, Tailwind CSS, and an image resolver |
-| Run the playground | Clone the repository | Next.js and the npm lockfile |
+| Run the playground | Clone the repository | Next.js and the pnpm lockfile |
 
-For a first experiment, run the repository locally and import [the example](../README.md#use-it-in-your-app) in your own page. It is not mounted in the existing playground.
+For a first experiment, run the repository locally and render `StreamingMarkdownView` in a page of your own, using the [README snippet](../README.md#use-it-in-your-app) as a starting point.
 
 ## 2. Copy the renderer
 
@@ -37,7 +37,7 @@ Retain the MIT license notice with copied source. You do not need the playground
 In an existing React 19 application, install the renderer dependencies:
 
 ```bash
-npm install react-markdown@10 remark-gfm@4 framer-motion@12 lucide-react@0.475 mdast-util-from-markdown@2
+npm install react-markdown@10 remark-gfm@4 lucide-react@0.475 mdast-util-from-markdown@2
 npm install -D @types/mdast@4
 ```
 
@@ -76,6 +76,44 @@ Import global CSS once from your root layout. For `app/globals.css` with the cop
     rgb(255 255 255 / 3%) 100%);
   background-size: 200% 100%;
   animation: shimmer 1.8s infinite linear;
+}
+
+/* Required, not decorative. `.capsule` applies the baseline offset the Craft
+   settings produce, and `.animate-rise-in` centres the hover card on the
+   capsule; without them the capsule sits off the text baseline and the card
+   is offset by half its width. Each entry animation defines only a `from`
+   frame, so the resting state stays correct if animation never runs. */
+.capsule {
+  transform: translateY(var(--capsule-offset, 0px));
+}
+.capsule:active {
+  transform: translateY(var(--capsule-offset, 0px)) scale(0.96);
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+}
+@keyframes rise-in {
+  from { opacity: 0; transform: translate(-50%, var(--rise-from, 6px)) scale(0.96); }
+}
+@keyframes zoom-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.95); }
+}
+
+.animate-fade-in { animation: fade-in 180ms ease-out; }
+.animate-rise-in { transform: translateX(-50%); animation: rise-in 200ms cubic-bezier(0.16, 1, 0.3, 1); }
+.animate-zoom-in { animation: zoom-in 200ms cubic-bezier(0.16, 1, 0.3, 1); }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in,
+  .animate-rise-in,
+  .animate-zoom-in,
+  .animate-shimmer {
+    animation: none;
+  }
+  .capsule:active {
+    transform: translateY(var(--capsule-offset, 0px));
+  }
 }
 ```
 
@@ -120,15 +158,35 @@ The supplied API routes require a server, not a static-only deployment. A React 
 
 ## 5. Render and inspect
 
-Copy [InlineMediaExample.tsx](../README.md#use-it-in-your-app), updating its source imports to your copied directory. Then render:
+Render `StreamingMarkdownView` and hold the inspected media in your own state. Without `onInspect`, capsules and hover previews still render, but clicking one does not open a lightbox.
 
 ```tsx
-<InlineMediaExample
-  content="An anglerfish ![Deep sea anglerfish](neanderthal:image) uses a glowing lure."
-/>
+'use client';
+
+import { useCallback, useState } from 'react';
+import { StreamingMarkdownView } from './src/neanderthal/components/StreamingMarkdownView';
+import { MediaLightbox } from './src/neanderthal/components/MediaLightbox';
+import { DEFAULT_CAPSULE_SETTINGS, type ResolvedMedia } from './src/neanderthal/core/types';
+
+export function Answer({ content, isStreaming }: { content: string; isStreaming?: boolean }) {
+  const [inspected, setInspected] = useState<ResolvedMedia | null>(null);
+  const close = useCallback(() => setInspected(null), []);
+
+  return (
+    <>
+      <StreamingMarkdownView
+        content={content}
+        isStreaming={isStreaming}
+        settings={DEFAULT_CAPSULE_SETTINGS}
+        onInspect={setInspected}
+      />
+      <MediaLightbox media={inspected} onClose={close} />
+    </>
+  );
+}
 ```
 
-The example manages the lightbox with React state. Without `onInspect`, capsules and hover previews render, but clicking does not open a lightbox.
+Mount one `MediaLightbox` per screen, not one per block: it is a modal, and the playground keeps a single instance above the whole essay.
 
 To customize geometry, pass a stable settings object to `StreamingMarkdownView`:
 
@@ -143,7 +201,7 @@ Define constant settings outside the component, or use state for interactive set
 Accumulate text from your existing stream and pass all Markdown received so far:
 
 ```tsx
-<InlineMediaExample content={accumulatedMarkdown} isStreaming={isReceiving} />
+<Answer content={accumulatedMarkdown} isStreaming={isReceiving} />
 ```
 
 An update might contain `Look at ![Angler`, followed by `Look at ![Anglerfish](neanderthal:image).`. Set `isStreaming` to false when the stream finishes or fails. Handle cancellation and errors in your app. Use a document-specific React `key` when switching to an unrelated document.
@@ -173,7 +231,7 @@ Ordinary links use `react-markdown`'s URL filter. Do not add raw HTML rendering 
 | Capsules become dots | Check `/api/resolve` and the image request separately |
 | Wikimedia 403 | Respect the upstream robot policy; check delivery from your intended host |
 | Click has no effect | Supply `onInspect` and an inspector |
-| Environment key alone gives no live answer | Current UI branches on its browser-saved key |
+| Server key set but no live answer | The key is read server-side and passed in as a prop; restart the dev server after editing `.env.local` |
 | Preview has no extra resolution | The demo returns the same thumbnail and full-image URL |
 
-Code examples, duplicate image claims, fallback caching, and browser cache growth have regression coverage. Modal keyboard accessibility and deployment access controls remain release work. The example is type-checked against this repository; a clean external-app integration and published package are not yet verified.
+Code examples, duplicate image claims, fallback caching, and browser cache growth have regression coverage. Modal keyboard accessibility and deployment access controls remain release work. The renderer is type-checked against this repository; a clean external-app integration and a published package are not yet verified.

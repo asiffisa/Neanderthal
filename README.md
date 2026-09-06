@@ -32,7 +32,7 @@ pnpm install
 pnpm dev -- --hostname 127.0.0.1
 ```
 
-Open [localhost:3000](http://localhost:3000). An answer streams in on load. Hover a capsule for a preview, click it to inspect, use the Craft controls to change capsule size and alignment, or paste your own Markdown into the input. None of that needs an API key; image search needs an internet connection.
+Open [localhost:3000](http://localhost:3000). An answer streams in on load. Hover a capsule for a preview, click it to inspect, use the Craft controls to change capsule size, baseline offset, and visual density, or paste your own Markdown into the input. None of that needs an API key; image search needs an internet connection.
 
 ### Optional: live AI answers
 
@@ -42,7 +42,9 @@ Set a Gemini key on the server to enable Shuffle and live answers:
 cp .env.example .env.local   # then fill in GEMINI_API_KEY
 ```
 
-`GEMINI_MODEL` overrides the default model. The API routes have no auth or rate limiting, so do not put a shared key on a public deployment.
+`GEMINI_MODEL` overrides the default (`gemini-3.5-flash-lite`); if a model is unavailable both AI routes fall back down a ladder of older ones. If you fork this, set `USER_AGENT` to identify your own deployment — [Wikimedia's User-Agent policy](https://foundation.wikimedia.org/wiki/Policy:Wikimedia_Foundation_User-Agent_Policy) expects a descriptive one.
+
+The API routes have no auth or rate limiting, so do not put a shared key on a public deployment.
 
 ### Checks
 
@@ -52,7 +54,7 @@ pnpm exec tsc --noEmit
 pnpm build
 ```
 
-`pnpm lint` still prompts for ESLint setup; it is not a validation gate yet.
+`pnpm lint` is not a validation gate: it prompts for ESLint setup, and `next lint` is deprecated in Next.js 16.
 
 ## Markdown syntax
 
@@ -82,7 +84,7 @@ import { DEFAULT_CAPSULE_SETTINGS } from './src/core/types';
 />
 ```
 
-Requires Tailwind CSS and `/api/resolve` on the same origin. Add `onInspect` and `MediaLightbox` for click-to-inspect. Details in the [integration guide](docs/INTEGRATION.md).
+Requires Tailwind CSS, `/api/resolve` on the same origin, and a short block of plain CSS — capsule baseline offset and popover centring live there, so the layout is wrong without it. Add `onInspect` and `MediaLightbox` for click-to-inspect. Details in the [integration guide](docs/INTEGRATION.md).
 
 ## Layout
 
