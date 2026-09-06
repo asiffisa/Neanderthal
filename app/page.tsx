@@ -1,3 +1,4 @@
+import { Fragment } from 'react';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import Image from 'next/image';
@@ -7,7 +8,6 @@ import { HeaderLottie } from '../src/components/HeaderLottie';
 import { defaultModel, serverApiKey } from '../src/lib/gemini';
 import styles from './essay.module.css';
 
-const modernWritingHeading = 'Modern writing chose speed over visible meaning';
 const playgroundHeading = 'Put the picture where the meaning happens';
 const pictographicHeading = 'The evolution of pictographic script';
 const pictographicTransition = "They weren't alone.";
@@ -39,6 +39,24 @@ function PictographicScriptSection({ markdown }: { markdown: string }) {
         const panel = pictographicPanels.find(({ marker }) => block.includes(marker));
 
         if (!panel) {
+          if (block.startsWith('## ')) {
+            return (
+              <Fragment key={block}>
+                <EssayMarkdown>{block}</EssayMarkdown>
+                <figure className={styles.coverImage}>
+                  <Image
+                    src="/Lascaux-Grotto-cave-paintings-Dordogne-France.webp"
+                    alt="Lascaux cave paintings in Dordogne, France"
+                    width={1600}
+                    height={440}
+                    sizes="(max-width: 864px) calc(100vw - 40px), 800px"
+                    priority
+                  />
+                </figure>
+              </Fragment>
+            );
+          }
+
           if (block === pictographicTransition) {
             return (
               <div key={pictographicTransition} className={styles.scriptTransition}>
@@ -103,22 +121,7 @@ export default async function EssayPage() {
               const heading = section.match(/^## (.+)/)?.[1] || '';
               return (
                 <section key={heading} className={styles.section} aria-label={heading}>
-                  {heading === modernWritingHeading ? (
-                    <div className={styles.prose}>
-                      <h2>{heading}</h2>
-                      <figure className={styles.coverImage}>
-                        <Image
-                          src="/Lascaux-Grotto-cave-paintings-Dordogne-France.webp"
-                          alt="Lascaux cave paintings in Dordogne, France"
-                          width={1600}
-                          height={440}
-                          sizes="(max-width: 864px) calc(100vw - 40px), 800px"
-                          priority
-                        />
-                      </figure>
-                      <EssayMarkdown>{section.replace(/^##\s+.+\n*/, '')}</EssayMarkdown>
-                    </div>
-                  ) : heading === pictographicHeading ? (
+                  {heading === pictographicHeading ? (
                     <PictographicScriptSection markdown={section} />
                   ) : (
                     <div className={styles.prose}>
