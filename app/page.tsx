@@ -84,6 +84,7 @@ export default async function EssayPage() {
                 <HeaderLottie />
                 <h1>{title}</h1>
               </div>
+              {subtitle && <p>{subtitle}</p>}
               <a
                 href="https://github.com/asiffisa/Neanderthal"
                 target="_blank"
@@ -96,7 +97,6 @@ export default async function EssayPage() {
                 </svg>
                 <span>View on github</span>
               </a>
-              {subtitle && <p>{subtitle}</p>}
             </header>
 
             {sections.map((section) => {
