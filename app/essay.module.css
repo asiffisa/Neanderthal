@@ -20,12 +20,12 @@
 .titleGroup {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 10px;
 }
 
 @media (min-width: 640px) {
   .titleGroup {
-    gap: 16px;
+    gap: 12px;
   }
 }
 
@@ -81,10 +81,10 @@
 }
 
 .header h1 {
-  font-size: clamp(36px, 5vw, 52px);
-  font-weight: 600;
-  line-height: 1.1;
-  letter-spacing: -0.04em;
+  font-size: clamp(24px, calc(2.5vw + 2px), 30px);
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.025em;
   text-wrap: balance;
 }
 

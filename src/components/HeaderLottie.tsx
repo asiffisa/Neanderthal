@@ -64,9 +64,7 @@ export function HeaderLottie() {
     <div
       ref={containerRef}
       aria-hidden="true"
-      className="shrink-0 aspect-[219/215] w-[32px] h-[32px] md:w-[44px] md:h-[44px] select-none pointer-events-none overflow-hidden rounded-[8px] isolate"
+      className="shrink-0 aspect-[219/215] w-[24px] h-[24px] md:w-[30px] md:h-[30px] select-none pointer-events-none overflow-hidden rounded-[6px] isolate"
     />
-
-
   );
 }
