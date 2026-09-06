@@ -128,7 +128,16 @@ function isDisambiguationOrNameListPage(extract?: string, title?: string): boole
 
 function isEducationalOrScientificContext(context?: string): boolean {
   if (!context) return false;
-  return /\b(onion|tear|plant|cell|biology|botany|chemical|chemistry|physics|space|geology|earth|ocean|rock|mineral|quantum|molecule|enzyme|acid|tissue|bacteria|organism|neuroscience|acoustics|memory|brain|sound|science)\b/i.test(context);
+  return /\b(onion|tear|plant|cell|biolog|botan|chemic|physic|space|geolog|earth|ocean|rock|mineral|quantum|molecul|enzyme|acid|tissue|bacteri|organism|neuroscience|acoustic|memor|brain|sound|scienc)/i.test(context);
+}
+
+function isMediaOrEntertainmentWork(extract?: string, title?: string): boolean {
+  const t = (title || '').toLowerCase();
+  const e = (extract || '').slice(0, 350).toLowerCase();
+  if (/\b(album|soundtrack|extended play|single|song|band|video game|film|documentary|movie|series|franchise)\b/i.test(t)) {
+    return true;
+  }
+  return /\b(?:is|was) an? (?:[0-9]{4}\s+)?(?:American|British|Canadian|Australian|French|German|Japanese|Chinese|Indian|[A-Z][a-z]+\s+)?(?:documentary|film|movie|album|song|single|rock band|punk band|punk rock band|musical group|music group|band|video game|television series|tv series)\b/i.test(e);
 }
 
 function generateCandidateSpellings(word: string): string[] {
@@ -195,14 +204,26 @@ function isRelevantWikipediaPage(pageTitle: string, query: string, context?: str
   const lowerExtract = (extract || '').toLowerCase();
 
   const isPerson = isPersonBiography(extract, pageTitle);
+  const isMedia = isMediaOrEntertainmentWork(extract, pageTitle);
   const isScientific = isEducationalOrScientificContext(context);
 
   // If the page is a person biography:
   // Reject if:
-  // 1. Context is scientific/educational (e.g. Onion biochemistry vs wrestler/musician/actor)
-  // 2. Query is a single token that only matches a surname or first name (e.g. query "allin" vs "Darby Allin"),
+  // 1. Context is scientific/educational
+  // 2. Query is a single token that only matches a surname or first name (e.g. "allin" vs "Darby Allin"),
   //    unless the user explicitly typed the person's full name (alphaTitle === alphaQuery)
   if (isPerson) {
+    if (isScientific) return false;
+    if (queryTokens.length === 1 && alphaTitle !== alphaQuery) {
+      return false;
+    }
+  }
+
+  // If the page is a media work (film, album, song, band, game):
+  // Reject if:
+  // 1. Context is scientific/educational
+  // 2. Query is a single token and title has multiple words (e.g. "allin" vs "Hated: GG Allin and the Murder Junkies")
+  if (isMedia) {
     if (isScientific) return false;
     if (queryTokens.length === 1 && alphaTitle !== alphaQuery) {
       return false;
@@ -253,20 +274,13 @@ function isRelevantWikipediaPage(pageTitle: string, query: string, context?: str
   // 4. Single-token query check:
   // If query is a single token, only accept multi-word titles if:
   // - The page is NOT a person/biography (already checked above)
-  // - The page is NOT a film/band/media title when context isn't media
+  // - The page is NOT a film/band/media title (already checked above)
+  // - The title is concise (at most 2 content tokens, e.g. "Bacterial cell")
   // - The title contains the token or stem as a standalone word
   if (queryTokens.length === 1) {
     const q = queryTokens[0];
     const qStem = queryStems[0];
-    if (titleTokens.includes(q) || titleStems.includes(qStem)) {
-      if (titleTokens.length > 1 && isScientific) {
-        if (
-          /\b(album|film|song|band|video game|wrestling|championship)\b/i.test(lowerExtract) ||
-          /\b(album|film|song|band)\b/i.test(lowerTitle)
-        ) {
-          return false;
-        }
-      }
+    if (titleTokens.length <= 2 && (titleTokens.includes(q) || titleStems.includes(qStem))) {
       return true;
     }
   }
@@ -505,33 +519,8 @@ async function searchWikipedia(
       }
     }
 
-    // 3. If exact matching page exists but lacked a lead infobox thumbnail (e.g. Photon), fetch images from that article
-    if (exactMatch) {
-      const fallback = await getPageImagesFallback(signal, exactMatch.title, isExcluded);
-      if (fallback) {
-        return {
-          ...fallback,
-          extract: exactMatch.extract,
-        };
-      }
-    }
-
-    // 4. If top relevant page lacked a lead thumbnail, fetch images from that article
-    const topRelevant = rawPages.find((p) =>
-      !isDisambiguationOrNameListPage(p.extract, p.title) &&
-      isRelevantWikipediaPage(p.title || '', searchTerm, context, p.extract)
-    );
-    if (topRelevant && topRelevant !== exactMatch) {
-      const fallback = await getPageImagesFallback(signal, topRelevant.title, isExcluded);
-      if (fallback) {
-        return {
-          ...fallback,
-          extract: topRelevant.extract,
-        };
-      }
-    }
-
-    // 5. Try candidate spellings for near-miss typos (e.g. vowel doubling in biochemistry/botany like "allin" -> "Alliin")
+    // 3. Try candidate spellings for near-miss typos (e.g. vowel doubling in biochemistry/botany like "allin" -> "Alliin")
+    // Runs before generic fallback scraping so a genuine canonical encyclopedic entity takes precedence
     const candidates = generateCandidateSpellings(searchTerm);
     if (candidates.length > 0) {
       const candidateUrl = `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(
@@ -550,7 +539,8 @@ async function searchWikipedia(
             const match = cPages.find(
               (p) =>
                 cleanAlphanumeric(p.title || '').toLowerCase() === cleanAlphanumeric(cand) &&
-                !isPersonBiography(p.extract, p.title)
+                !isPersonBiography(p.extract, p.title) &&
+                !isMediaOrEntertainmentWork(p.extract, p.title)
             );
             if (match && match.thumbnail?.source && !isExcluded(match.thumbnail.source)) {
               return {
@@ -563,6 +553,32 @@ async function searchWikipedia(
           }
         }
       } catch {}
+    }
+
+    // 4. If exact matching page exists but lacked a lead infobox thumbnail (e.g. Photon), fetch images from that article
+    if (exactMatch) {
+      const fallback = await getPageImagesFallback(signal, exactMatch.title, isExcluded);
+      if (fallback) {
+        return {
+          ...fallback,
+          extract: exactMatch.extract,
+        };
+      }
+    }
+
+    // 5. If top relevant page lacked a lead thumbnail, fetch images from that article
+    const topRelevant = rawPages.find((p) =>
+      !isDisambiguationOrNameListPage(p.extract, p.title) &&
+      isRelevantWikipediaPage(p.title || '', searchTerm, context, p.extract)
+    );
+    if (topRelevant && topRelevant !== exactMatch) {
+      const fallback = await getPageImagesFallback(signal, topRelevant.title, isExcluded);
+      if (fallback) {
+        return {
+          ...fallback,
+          extract: topRelevant.extract,
+        };
+      }
     }
   } catch {
     // Network error
