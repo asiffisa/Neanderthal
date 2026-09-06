@@ -104,23 +104,79 @@ function simplifyQuery(query: string): string {
 
 const cleanAlphanumeric = (s: string) => s.toLowerCase().replace(/[^\w]/g, '');
 
+function isPersonBiography(extract?: string, title?: string): boolean {
+  if (!extract) return false;
+  const text = extract.slice(0, 350);
+  const hasBirthOrDates = /\((?:born\b|\d{1,2}\s+[A-Za-z]+\s+\d{3,4}|\d{3,4}\s*[-–—]\s*(?:\d{3,4}|present)?|c\.\s*\d{3,4}|\bfl\.\s*\d{3,4})/i.test(text);
+  const hasOccupation = /\b(?:is|was) an? (?:[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?\s+)?(?:former\s+|professional\s+)?(?:wrestler|actor|actress|singer|musician|guitarist|bassist|drummer|vocalist|rapper|composer|songwriter|athlete|footballer|cricketer|baseball|basketball|golfer|boxer|tennis player|politician|serial killer|pornographic|model|influencer|comedian|celebrity|director|producer|playwright|poet|novelist)\b/i.test(text);
+  return hasBirthOrDates || hasOccupation;
+}
+
+function isDisambiguationOrNameListPage(extract?: string, title?: string): boolean {
+  if (title && /\s\((?:disambiguation|surname)\)$/i.test(title)) return true;
+  if (!extract) return false;
+  const text = extract.slice(0, 250).toLowerCase();
+  return (
+    text.includes('is both a surname and a given name') ||
+    text.includes('is a surname') ||
+    text.includes('is a given name') ||
+    text.includes('may refer to:') ||
+    text.includes('most commonly refers to:') ||
+    text.includes('refer to:')
+  );
+}
+
+function isEducationalOrScientificContext(context?: string): boolean {
+  if (!context) return false;
+  return /\b(onion|tear|plant|cell|biology|botany|chemical|chemistry|physics|space|geology|earth|ocean|rock|mineral|quantum|molecule|enzyme|acid|tissue|bacteria|organism|neuroscience|acoustics|memory|brain|sound|science)\b/i.test(context);
+}
+
+function generateCandidateSpellings(word: string): string[] {
+  const w = word.toLowerCase().trim();
+  if (w.length < 3 || w.length > 25 || w.includes(' ')) return [];
+
+  const candidates = new Set<string>();
+
+  // 1. Vowel doubling: in biochemistry and Latin taxonomy, vowels (especially i, o, e) are frequently doubled:
+  // e.g. allin -> alliin, oocyte -> oocyte, zoology
+  for (let i = 0; i < w.length; i++) {
+    const char = w[i];
+    if ('aeiou'.includes(char) && w[i - 1] !== char && w[i + 1] !== char) {
+      const doubled = w.slice(0, i + 1) + char + w.slice(i + 1);
+      candidates.add(doubled);
+    }
+  }
+
+  // 2. Letter undoubling: e.g. alliin -> allin, chlorophyll -> chlorophyl
+  for (let i = 0; i < w.length - 1; i++) {
+    if (w[i] === w[i + 1]) {
+      const undoubled = w.slice(0, i) + w.slice(i + 1);
+      candidates.add(undoubled);
+    }
+  }
+
+  // 3. Common biochemical / scientific suffixes
+  if (w.endsWith('in') && !w.endsWith('iin')) {
+    candidates.add(w.slice(0, -2) + 'iin'); // e.g. allin -> alliin
+  }
+  if (w.endsWith('ase') && !w.endsWith('iase')) {
+    candidates.add(w.slice(0, -3) + 'iase'); // e.g. allinase -> alliinase
+  }
+
+  candidates.delete(w);
+  return Array.from(candidates).slice(0, 6);
+}
+
 function isRelevantWikipediaPage(pageTitle: string, query: string, context?: string, extract?: string): boolean {
   if (!pageTitle || !query) return false;
 
+  // Immediately reject disambiguation, surname directory, and index lists
+  if (isDisambiguationOrNameListPage(extract, pageTitle)) {
+    return false;
+  }
+
   const alphaTitle = cleanAlphanumeric(pageTitle);
   const alphaQuery = cleanAlphanumeric(query);
-
-  // 1. Direct alphanumeric match (handles compound words like "Shock wave" vs "Shockwave", "deep sea" vs "deepsea")
-  if (alphaTitle === alphaQuery || alphaTitle.includes(alphaQuery) || alphaQuery.includes(alphaTitle)) {
-    return true;
-  }
-
-  // Singular/plural and stem matching (handles standard s/es and irregular Latin plurals like bacterium <-> bacteria)
-  const stemTitle = stemWord(alphaTitle);
-  const stemQuery = stemWord(alphaQuery);
-  if (stemTitle === stemQuery || stemTitle.includes(stemQuery) || stemQuery.includes(stemTitle)) {
-    return true;
-  }
 
   const normalize = (s: string) =>
     s
@@ -138,7 +194,46 @@ function isRelevantWikipediaPage(pageTitle: string, query: string, context?: str
   const lowerTitle = pageTitle.toLowerCase();
   const lowerExtract = (extract || '').toLowerCase();
 
-  // 2. Multi-word query check: ensure at least 2 tokens match or >= 60% of tokens match
+  const isPerson = isPersonBiography(extract, pageTitle);
+  const isScientific = isEducationalOrScientificContext(context);
+
+  // If the page is a person biography:
+  // Reject if:
+  // 1. Context is scientific/educational (e.g. Onion biochemistry vs wrestler/musician/actor)
+  // 2. Query is a single token that only matches a surname or first name (e.g. query "allin" vs "Darby Allin"),
+  //    unless the user explicitly typed the person's full name (alphaTitle === alphaQuery)
+  if (isPerson) {
+    if (isScientific) return false;
+    if (queryTokens.length === 1 && alphaTitle !== alphaQuery) {
+      return false;
+    }
+  }
+
+  // 1. Direct alphanumeric match (handles compound words like "Shock wave" vs "Shockwave", "deep sea" vs "deepsea")
+  if (alphaTitle === alphaQuery) {
+    return true;
+  }
+
+  // Singular/plural and stem matching (handles standard s/es and irregular Latin plurals like bacterium <-> bacteria)
+  const stemTitle = stemWord(alphaTitle);
+  const stemQuery = stemWord(alphaQuery);
+  if (stemTitle === stemQuery) {
+    return true;
+  }
+
+  // 2. Descriptive query containing the core entity:
+  // e.g. query "actin-like cytoskeleton" contains title "Cytoskeleton",
+  // or query "deep sea hydrothermal vent" contains title "Hydrothermal vent".
+  // Every non-stopword token of the title is present in the query.
+  if (
+    titleTokens.length > 0 &&
+    titleTokens.length <= queryTokens.length &&
+    titleTokens.every((t, idx) => queryTokens.includes(t) || queryStems.includes(titleStems[idx]))
+  ) {
+    return true;
+  }
+
+  // 3. Multi-word query check: ensure at least 2 tokens match or >= 60% of tokens match
   if (queryTokens.length >= 2) {
     const matched = queryTokens.filter((q, i) => {
       const qStem = queryStems[i];
@@ -150,31 +245,45 @@ function isRelevantWikipediaPage(pageTitle: string, query: string, context?: str
         lowerExtract.includes(qStem)
       );
     }).length;
-    return matched >= 2 || matched / queryTokens.length >= 0.6;
+    if (matched >= 2 || matched / queryTokens.length >= 0.6) {
+      return true;
+    }
   }
 
-  // 3. Single-token overlap check with query
-  const hasQueryTokenMatch = queryTokens.some((q, i) => {
-    const qStem = queryStems[i];
-    return (
-      titleTokens.includes(q) ||
-      titleStems.includes(qStem) ||
-      lowerTitle.includes(q) ||
-      lowerTitle.includes(qStem)
-    );
-  });
-  if (hasQueryTokenMatch) return true;
+  // 4. Single-token query check:
+  // If query is a single token, only accept multi-word titles if:
+  // - The page is NOT a person/biography (already checked above)
+  // - The page is NOT a film/band/media title when context isn't media
+  // - The title contains the token or stem as a standalone word
+  if (queryTokens.length === 1) {
+    const q = queryTokens[0];
+    const qStem = queryStems[0];
+    if (titleTokens.includes(q) || titleStems.includes(qStem)) {
+      if (titleTokens.length > 1 && isScientific) {
+        if (
+          /\b(album|film|song|band|video game|wrestling|championship)\b/i.test(lowerExtract) ||
+          /\b(album|film|song|band)\b/i.test(lowerTitle)
+        ) {
+          return false;
+        }
+      }
+      return true;
+    }
+  }
 
-  // 4. Token overlap check with context (if context is a concise entity)
+  // 5. Token overlap check with context (if context is a concise entity)
   if (contextTokens.length > 0 && contextTokens.length <= 3) {
     const hasContextMatch = contextTokens.some((c) => titleTokens.includes(c) || lowerTitle.includes(c));
-    if (hasContextMatch) return true;
+    const hasAnyQueryRel = queryTokens.some((q, i) =>
+      titleTokens.includes(q) || titleStems.includes(queryStems[i]) || lowerTitle.includes(q) || lowerExtract.includes(q)
+    );
+    if (hasContextMatch && hasAnyQueryRel) return true;
   }
 
   return false;
 }
 
-function scoreWikipediaPage(page: any, query: string): number {
+function scoreWikipediaPage(page: any, query: string, context?: string): number {
   let score = 50 - (page.index ?? 10) * 4;
 
   const normTitle = cleanAlphanumeric(page.title || '');
@@ -184,9 +293,9 @@ function scoreWikipediaPage(page: any, query: string): number {
   if (normTitle === normQ) {
     score += 75;
   } else if (normTitle.startsWith(normQ) || normTitle.endsWith(normQ)) {
-    score += 40;
-  } else if (normTitle.includes(normQ) || normQ.includes(normTitle)) {
     score += 25;
+  } else if (normTitle.includes(normQ) || normQ.includes(normTitle)) {
+    score += 15;
   }
 
   const title = (page.title || '').toLowerCase();
@@ -195,6 +304,21 @@ function scoreWikipediaPage(page: any, query: string): number {
   // Disqualify vector logos, crests, SVGs, and Wikipedia template images
   if (isJunkOrMaintenanceImage(imgUrl)) {
     return -999;
+  }
+
+  // Disqualify disambiguation / surname pages
+  if (isDisambiguationOrNameListPage(page.extract, page.title)) {
+    return -999;
+  }
+
+  // Penalize or disqualify person biographies on general/scientific lookups
+  if (isPersonBiography(page.extract, page.title)) {
+    if (isEducationalOrScientificContext(context)) {
+      return -999;
+    }
+    if (normTitle !== normQ) {
+      score -= 50;
+    }
   }
 
   // Wikipedia disambiguates a secondary sense with a parenthetical, e.g. "Shockwave (software)".
@@ -338,12 +462,13 @@ async function searchWikipedia(
       const aq = cleanAlphanumeric(searchTerm);
       const st = stemWord(at);
       const sq = stemWord(aq);
-      return (
+      const matches = (
         at === aq ||
         st === sq ||
         (aq.endsWith('s') && !aq.endsWith('ss') && at === aq.slice(0, -1)) ||
         (at.endsWith('s') && !at.endsWith('ss') && at.slice(0, -1) === aq)
       );
+      return matches && !isDisambiguationOrNameListPage(p.extract, p.title);
     });
 
     if (occurrence === 0 && exactMatch && exactMatch.thumbnail?.source && !isExcluded(exactMatch.thumbnail.source)) {
@@ -363,7 +488,7 @@ async function searchWikipedia(
 
     const scoredPages = validPages
       .filter((p) => isRelevantWikipediaPage(p.title || '', searchTerm, context, p.extract))
-      .map((p) => ({ page: p, score: scoreWikipediaPage(p, searchTerm) }))
+      .map((p) => ({ page: p, score: scoreWikipediaPage(p, searchTerm, context) }))
       .filter((item) => item.score > 0)
       .sort((a, b) => b.score - a.score);
 
@@ -393,6 +518,7 @@ async function searchWikipedia(
 
     // 4. If top relevant page lacked a lead thumbnail, fetch images from that article
     const topRelevant = rawPages.find((p) =>
+      !isDisambiguationOrNameListPage(p.extract, p.title) &&
       isRelevantWikipediaPage(p.title || '', searchTerm, context, p.extract)
     );
     if (topRelevant && topRelevant !== exactMatch) {
@@ -403,6 +529,40 @@ async function searchWikipedia(
           extract: topRelevant.extract,
         };
       }
+    }
+
+    // 5. Try candidate spellings for near-miss typos (e.g. vowel doubling in biochemistry/botany like "allin" -> "Alliin")
+    const candidates = generateCandidateSpellings(searchTerm);
+    if (candidates.length > 0) {
+      const candidateUrl = `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(
+        candidates.join('|')
+      )}&prop=pageimages|extracts&pithumbsize=600&pilimit=8&exintro=1&explaintext=1&redirects=1&format=json&origin=*`;
+      try {
+        const cRes = await fetchWithLimits(candidateUrl, {
+          headers: { 'User-Agent': USER_AGENT }, signal,
+        });
+        if (cRes.ok) {
+          const cData = await cRes.json();
+          const cPages = (Object.values(cData.query?.pages || {}) as any[]).filter(
+            (p) => p.pageid && p.pageid > 0 && !isDisambiguationOrNameListPage(p.extract, p.title)
+          );
+          for (const cand of candidates) {
+            const match = cPages.find(
+              (p) =>
+                cleanAlphanumeric(p.title || '').toLowerCase() === cleanAlphanumeric(cand) &&
+                !isPersonBiography(p.extract, p.title)
+            );
+            if (match && match.thumbnail?.source && !isExcluded(match.thumbnail.source)) {
+              return {
+                title: match.title,
+                imageUrl: match.thumbnail.source,
+                sourceUrl: `https://en.wikipedia.org/wiki/${encodeURIComponent(match.title.replace(/\s+/g, '_'))}`,
+                extract: match.extract,
+              };
+            }
+          }
+        }
+      } catch {}
     }
   } catch {
     // Network error

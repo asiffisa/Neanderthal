@@ -118,3 +118,81 @@ it('immediately rejects trivial divisions, metrics, and sensations without invok
   expect(fetchMock).not.toHaveBeenCalled();
 });
 
+it('strictly rejects person biographies like Darby Allin when searching single-token allin', async () => {
+  const wrestlerUrl = 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/ef/Darby_Allin.jpg/960px-Darby_Allin.jpg';
+  const fetchMock = vi.fn(async (url: string) => {
+    // Return the exact pages Wikipedia returns for search "allin"
+    if (url.includes('gsrsearch=allin')) {
+      return Response.json({
+        query: {
+          pages: {
+            1: { title: 'GG Allin', index: 1, extract: 'Kevin Michael "GG" Allin was an American punk rock musician.' },
+            2: { title: 'Allin', index: 2, extract: 'Allin is both a surname and a given name. Notable people with the name include:' },
+            3: { title: 'Darby Allin', index: 3, extract: 'Samuel Ratsch (born January 7, 1993) is an American professional wrestler.', thumbnail: { source: wrestlerUrl } },
+          },
+        },
+      });
+    }
+    // Any candidate queries return empty
+    return Response.json({ query: { pages: {} } });
+  });
+
+  vi.stubGlobal('fetch', fetchMock);
+  const { GET } = await import('./route');
+
+  // Test both with and without context
+  const resWithContext = await GET(new NextRequest('http://localhost/api/resolve?q=allin&context=Onions%20%26%20Tears&source=wikipedia'));
+  const dataWithContext = await resWithContext.json();
+  expect(dataWithContext.title).not.toBe('Darby Allin');
+  expect(dataWithContext.thumbnailUrl).toBeNull();
+  expect(dataWithContext.status).toBe('not-found');
+
+  const resBare = await GET(new NextRequest('http://localhost/api/resolve?q=allin&source=wikipedia'));
+  const dataBare = await resBare.json();
+  expect(dataBare.title).not.toBe('Darby Allin');
+  expect(dataBare.thumbnailUrl).toBeNull();
+  expect(dataBare.status).toBe('not-found');
+});
+
+it('resolves typo allin to Alliin chemical entity via candidate spelling resolution', async () => {
+  const alliinUrl = 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0e/L-alliin-2D-skeletal.png/960px-L-alliin-2D-skeletal.png';
+  const wrestlerUrl = 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/ef/Darby_Allin.jpg/960px-Darby_Allin.jpg';
+
+  const fetchMock = vi.fn(async (url: string) => {
+    if (url.includes('gsrsearch=allin')) {
+      return Response.json({
+        query: {
+          pages: {
+            1: { title: 'Allin', index: 2, extract: 'Allin is both a surname and a given name.' },
+            2: { title: 'Darby Allin', index: 3, extract: 'Samuel Ratsch (born January 7, 1993) is an American professional wrestler.', thumbnail: { source: wrestlerUrl } },
+          },
+        },
+      });
+    }
+    if (url.includes('titles=')) {
+      return Response.json({
+        query: {
+          pages: {
+            3444669: {
+              pageid: 3444669,
+              title: 'Alliin',
+              extract: 'Alliin is a sulfoxide that is a natural constituent of fresh garlic.',
+              thumbnail: { source: alliinUrl },
+            },
+          },
+        },
+      });
+    }
+    return Response.json({ query: { pages: {} } });
+  });
+
+  vi.stubGlobal('fetch', fetchMock);
+  const { GET } = await import('./route');
+
+  const res = await GET(new NextRequest('http://localhost/api/resolve?q=allin&context=Onions%20%26%20Tears&source=wikipedia'));
+  const data = await res.json();
+  expect(data.title).toBe('Alliin');
+  expect(canonicalImageUrl(data.thumbnailUrl)).toBe(canonicalImageUrl(alliinUrl));
+  expect(data.status).toBe('loaded');
+});
+

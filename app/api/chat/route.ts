@@ -98,6 +98,9 @@ STRICT RULES FOR SEARCH ACCURACY:
    CORRECT: "the actin-like cytoskeleton ![Cytoskeleton](neanderthal:image)"
    WRONG: "the actin-like cytoskeleton ![actin-like cytoskeleton](neanderthal:image)"
    The surrounding prose provides the descriptive context; the tag itself should be the clean searchable entity name.
+5. STRICT SCIENTIFIC & CHEMICAL PRECISION:
+   - Pay meticulous attention to exact chemical and botanical spellings (e.g. ![Alliin](neanderthal:image) with double 'i', ![Alliinase](neanderthal:image), ![Allicin](neanderthal:image), ![Syn-propanethial-S-oxide](neanderthal:image)).
+   - NEVER tag ambiguous single surnames or informal short names (e.g. never tag ![Allin] or ![Smith]). Always tag the full, unambiguous encyclopedic entity name.
 
 PROVIDER BALANCING & SPREAD (DUCKDUCKGO + WIKIPEDIA):
 - DuckDuckGo Web Imagery: ![Subject](neanderthal:image?provider=duckduckgo)
